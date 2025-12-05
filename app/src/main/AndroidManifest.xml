@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    
+    <!-- Hardware Features -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="true" />
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
+    
+    <!-- Location Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    
+    <!-- Audio Permission for Voice Detection -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <!-- SMS for Emergency Alerts -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    
+    <!-- Sensors & Vibration -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Foreground Service Permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SafePasigAI"
+        tools:targetApi="34">
+        
+        <!-- Foreground Service for Safety Monitoring -->
+        <service
+            android:name=".service.SmartEscortService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone|location" />
+        
+        <!-- Activities -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+            
+        <activity
+            android:name=".ui.SOSActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop" />
+            
+        <activity
+            android:name=".ui.MonitoringActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+            
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

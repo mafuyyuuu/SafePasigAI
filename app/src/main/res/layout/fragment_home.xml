@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/pasig_bg"
+    android:clipChildren="false"
+    tools:context=".ui.HomeFragment">
+
+    <!-- Scrollable Content -->
+    <ScrollView
+        android:id="@+id/scrollView2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        app:layout_constraintBottom_toTopOf="@id/bottomNav"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:paddingBottom="32dp">
+
+            <!-- Header Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/satoshi_medium"
+                        android:text="Magandang Gabi,"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/satoshi_black"
+                        android:text="Jhervin"
+                        android:textColor="@color/text_primary"
+                        android:textSize="26sp" />
+                </LinearLayout>
+
+                <!-- Avatar -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="@color/white"
+                    app:strokeWidth="2dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_launcher_background" />
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- Start Escort Main Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnStartEscort"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardBackgroundColor="@color/pasig_dark"
+                app:cardCornerRadius="24dp">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="24dp">
+
+                    <!-- Icon Circle -->
+                    <View
+                        android:id="@+id/iconBg"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_rounded_12"
+                        android:backgroundTint="#33FFFFFF"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_walk"
+                        app:layout_constraintBottom_toBottomOf="@id/iconBg"
+                        app:layout_constraintEnd_toEndOf="@id/iconBg"
+                        app:layout_constraintStart_toStartOf="@id/iconBg"
+                        app:layout_constraintTop_toTopOf="@id/iconBg"
+                        app:tint="@color/white" />
+
+                    <!-- Play Button -->
+                    <View
+                        android:id="@+id/playBtn"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_white_rounded"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@android:drawable/ic_media_play"
+                        app:layout_constraintBottom_toBottomOf="@id/playBtn"
+                        app:layout_constraintEnd_toEndOf="@id/playBtn"
+                        app:layout_constraintStart_toStartOf="@id/playBtn"
+                        app:layout_constraintTop_toTopOf="@id/playBtn"
+                        app:tint="@color/pasig_dark" />
+
+                    <!-- Text -->
+                    <TextView
+                        android:id="@+id/titleText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:fontFamily="@font/satoshi_bold"
+                        android:lineSpacingExtra="4dp"
+                        android:text="Start Smart\nEscort"
+                        android:textColor="@color/white"
+                        android:textSize="24sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/iconBg" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="@font/satoshi_medium"
+                        android:text="AI Audio &amp; Motion Detection"
+                        android:textColor="#99FFFFFF"
+                        android:textSize="12sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/titleText" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Stats Grid -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:orientation="horizontal">
+
+                <!-- Status Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="160dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="24dp">
+
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="20dp">
+
+                        <!-- Shield Icon -->
+                        <View
+                            android:id="@+id/shieldBg"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_white_rounded"
+                            android:backgroundTint="#E6EFFB"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_shield_check"
+                            app:layout_constraintBottom_toBottomOf="@id/shieldBg"
+                            app:layout_constraintEnd_toEndOf="@id/shieldBg"
+                            app:layout_constraintStart_toStartOf="@id/shieldBg"
+                            app:layout_constraintTop_toTopOf="@id/shieldBg"
+                            app:tint="@color/pasig_dark" />
+
+                        <!-- Secure Badge -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_white_rounded"
+                            android:backgroundTint="@color/success_bg"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:text="SECURE"
+                            android:textColor="@color/success_green"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_black"
+                            android:text="100%"
+                            android:textColor="@color/text_primary"
+                            android:textSize="32sp"
+                            app:layout_constraintBottom_toTopOf="@id/tvStatus"
+                            app:layout_constraintStart_toStartOf="parent" />
+
+                        <TextView
+                            android:id="@+id/tvStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_medium"
+                            android:text="System Status"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintStart_toStartOf="parent" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Location Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="160dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="2dp">
+
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="#FFFFFF"
+                        android:padding="20dp">
+
+                        <!-- Location Icon -->
+                        <View
+                            android:id="@+id/locBg"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_white_rounded"
+                            android:backgroundTint="#F8EBD3"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_location"
+                            app:layout_constraintBottom_toBottomOf="@id/locBg"
+                            app:layout_constraintEnd_toEndOf="@id/locBg"
+                            app:layout_constraintStart_toStartOf="@id/locBg"
+                            app:layout_constraintTop_toTopOf="@id/locBg"
+                            app:tint="@color/orange_500" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_bold"
+                            android:lineSpacingExtra="2dp"
+                            android:text="San Nicolas,\nPasig City"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            app:layout_constraintBottom_toTopOf="@id/lblLoc"
+                            app:layout_constraintStart_toStartOf="parent" />
+
+                        <TextView
+                            android:id="@+id/lblLoc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_medium"
+                            android:text="Current Location"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="10sp"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintStart_toStartOf="parent" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- Safety History Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:fontFamily="@font/satoshi_bold"
+                android:text="Safety History"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+
+            <!-- History Item 1 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <View
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_rounded_8"
+                            android:backgroundTint="#E8E8EB" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_house" />
+
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_bold"
+                            android:text="Arrived Home"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_regular"
+                            android:text="Yesterday, 8:30 PM"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- History Item 2 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="80dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#FFFFFF"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <View
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_rounded_8"
+                            android:backgroundTint="#A0FDE6E6" />
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_warning"
+                            app:tint="@color/alert_red" />
+
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_bold"
+                            android:text="False Alarm (Canceled)"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/satoshi_regular"
+                            android:text="Yesterday, 6:15 PM"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Bottom Navigation Bar -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="24dp"
+        app:cardCornerRadius="35dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="24dp">
+
+            <!-- Home -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.5">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_white_rounded"
+                    android:backgroundTint="@color/blue_bg"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_user"
+                    app:tint="@color/pasig_dark" />
+            </FrameLayout>
+
+            <!-- Stats -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_contacts"
+                    app:tint="@color/text_secondary" />
+            </FrameLayout>
+
+            <!-- Profile -->
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_weight="0.5">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    app:tint="@color/text_secondary" />
+            </FrameLayout>
+
+            <!-- Messages -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.7">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_chats"
+                    app:tint="@color/text_secondary" />
+            </FrameLayout>
+
+            <!-- Settings -->
+            <FrameLayout
+                android:id="@+id/btnSettings"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_weight="0.5">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_gear"
+                    app:tint="@color/text_secondary" />
+            </FrameLayout>
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- FIXED SOS BUTTON WITH CONSTRAINTS -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/fabSOS"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:background="@drawable/bg_white_rounded"
+        android:backgroundTint="@color/alert_red"
+        android:translationY="15dp"
+        app:layout_constraintEnd_toEndOf="@id/bottomNav"
+        app:layout_constraintStart_toStartOf="@id/bottomNav"
+        app:layout_constraintTop_toTopOf="@id/bottomNav"
+        app:layout_constraintBottom_toTopOf="@id/bottomNav">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_siren"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/white" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

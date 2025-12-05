@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/alert_red">
+
+    <!-- Ripple Effect Circles -->
+    <View
+        android:id="@+id/ripple1"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:background="@drawable/bg_circle"
+        android:backgroundTint="#4DFFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <View
+        android:id="@+id/ripple2"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:background="@drawable/bg_circle"
+        android:backgroundTint="#4DFFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <!-- Content Header -->
+    <LinearLayout
+        android:id="@+id/headerContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_marginBottom="32dp"
+        app:layout_constraintBottom_toTopOf="@id/sosButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Emergency Alert"
+            android:fontFamily="@font/satoshi_medium"
+            android:textColor="#CCFFFFFF"
+            android:textSize="16sp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sending Help..."
+            android:fontFamily="@font/satoshi_black"
+            android:textColor="@color/white"
+            android:textSize="28sp"
+            android:layout_marginTop="8dp"/>
+    </LinearLayout>
+
+    <!-- SOS Button with Countdown -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/sosButton"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        app:cardCornerRadius="80dp"
+        app:cardElevation="16dp"
+        app:cardBackgroundColor="@color/white"
+        app:strokeWidth="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tvCountdown"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="5"
+            android:fontFamily="@font/satoshi_black"
+            android:textColor="@color/alert_red"
+            android:textSize="72sp"/>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Contact Avatars -->
+    <LinearLayout
+        android:id="@+id/contactsSection"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_marginTop="32dp"
+        app:layout_constraintTop_toBottomOf="@id/sosButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Location sent to:"
+            android:fontFamily="@font/satoshi_medium"
+            android:textColor="#99FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"/>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:backgroundTint="@color/pasig_light"/>
+
+            <View
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:backgroundTint="@color/success_green"/>
+
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp">
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_circle"
+                    android:backgroundTint="#33FFFFFF"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="+1"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:fontFamily="@font/satoshi_bold"/>
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Cancel Button -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/btnCancel"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:layout_marginHorizontal="32dp"
+        android:layout_marginBottom="48dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#33FFFFFF"
+        app:strokeWidth="0.5dp"
+        app:rippleColor="#55FFFFFF"
+        android:clickable="true"
+        android:focusable="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="I AM SAFE (CANCEL)"
+            android:fontFamily="@font/satoshi_bold"
+            android:textColor="@color/white"
+            android:textSize="16sp"/>
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

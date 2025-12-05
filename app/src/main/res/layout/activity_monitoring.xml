@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/map_bg">
+
+    <!-- Map Grid Pattern Background -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.3"/>
+
+    <!-- Back Button -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/btnBack"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="40dp"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="10dp"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="@color/slate_700" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- AI Active Status Pill -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/statusPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="44dp"
+        app:cardBackgroundColor="#E6FFFFFF"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.9"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
+
+            <View
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/bg_white_rounded"
+                android:backgroundTint="@color/success_green" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="@font/satoshi_bold"
+                android:text="AI Active"
+                android:textColor="@color/pasig_dark"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Center Pulse Circle -->
+    <View
+        android:id="@+id/pulseCircle"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:background="@drawable/bg_white_rounded"
+        android:backgroundTint="#333B82F6"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/statusPill"/>
+
+    <ImageView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:src="@android:drawable/ic_btn_speak_now"
+        app:tint="@color/pasig_light"
+        app:layout_constraintBottom_toBottomOf="@id/pulseCircle"
+        app:layout_constraintEnd_toEndOf="@id/pulseCircle"
+        app:layout_constraintStart_toStartOf="@id/pulseCircle"
+        app:layout_constraintTop_toTopOf="@id/pulseCircle"/>
+
+    <!-- Bottom Sheet -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/bottomSheet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="40dp"
+        app:cardElevation="16dp"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="32dp">
+
+            <!-- Handle -->
+            <View
+                android:layout_width="48dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_white_rounded"
+                android:backgroundTint="@color/gray_100"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- Header Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="32dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Escort Active"
+                        android:fontFamily="@font/satoshi_bold"
+                        android:textColor="@color/pasig_dark"
+                        android:textSize="24sp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Monitoring Environment..."
+                        android:fontFamily="@font/satoshi_medium"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"/>
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+                    <View
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_white_rounded"
+                        android:backgroundTint="@color/blue_bg"/>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_mic"
+                        app:tint="@color/pasig_light"/>
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnStop"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_white_rounded"
+                    android:backgroundTint="@color/gray_100"
+                    android:fontFamily="@font/satoshi_bold"
+                    android:text="Stop"
+                    android:textAllCaps="false"
+                    android:textColor="@color/slate_600"
+                    android:textSize="16sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnSOS"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_white_rounded"
+                    android:backgroundTint="@color/alert_red"
+                    android:text="SOS"
+                    android:textAllCaps="false"
+                    android:fontFamily="@font/satoshi_bold"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

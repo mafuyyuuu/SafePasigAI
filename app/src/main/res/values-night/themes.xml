@@ -1,0 +1,16 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Force Light Mode even in dark mode -->
+    <style name="Base.Theme.SafePasigAI" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Surface colors for cards -->
+        <item name="colorSurface">@color/white</item>
+        <item name="colorSurfaceVariant">@color/white</item>
+        <item name="android:colorBackground">@color/pasig_bg</item>
+        
+        <!-- Card default colors -->
+        <item name="cardBackgroundColor">@color/white</item>
+        
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/pasig_dark</item>
+        <item name="colorPrimaryContainer">@color/pasig_light</item>
+    </style>
+</resources>
