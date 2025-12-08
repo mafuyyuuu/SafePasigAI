@@ -11,12 +11,18 @@ data class Message(
     val text: String = "",
     val timestamp: Long = 0L,
     val type: MessageType = MessageType.TEXT,
-    val isRead: Boolean = false,
+    val status: MessageStatus = MessageStatus.SENT,
+    val deliveredAt: Long = 0L,
+    val seenAt: Long = 0L,
+    val seenBy: List<String> = emptyList(),
     val locationLat: Double? = null,
     val locationLng: Double? = null
 ) {
     // No-arg constructor for Firebase
-    constructor() : this("", "", "", "", "", 0L, MessageType.TEXT, false, null, null)
+    constructor() : this("", "", "", "", "", 0L, MessageType.TEXT, MessageStatus.SENT, 0L, 0L, emptyList(), null, null)
+    
+    // Backward compatibility
+    val isRead: Boolean get() = status == MessageStatus.SEEN
 }
 
 enum class MessageType {
@@ -24,4 +30,11 @@ enum class MessageType {
     LOCATION,
     ALERT,
     SYSTEM
+}
+
+enum class MessageStatus {
+    SENDING,    // Message is being sent
+    SENT,       // Message sent to server
+    DELIVERED,  // Message delivered to recipient's device
+    SEEN        // Message has been read by recipient
 }

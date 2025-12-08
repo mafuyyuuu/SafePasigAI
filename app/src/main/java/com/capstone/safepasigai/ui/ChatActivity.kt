@@ -5,7 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.telephony.SmsManager
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -26,6 +30,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 /**
  * ChatActivity - Individual chat conversation screen.
  * Supports both Firebase in-app chat AND real SMS messaging.
+ * Features: Online status, typing indicators, message status (sent/delivered/seen)
  */
 class ChatActivity : AppCompatActivity() {
 
@@ -35,7 +40,9 @@ class ChatActivity : AppCompatActivity() {
         const val EXTRA_CHAT_NAME = "chat_name"
         const val EXTRA_IS_ONLINE = "is_online"
         const val EXTRA_CONTACT_PHONE = "contact_phone"
+        const val EXTRA_CONTACT_ID = "contact_id"
         private const val SMS_PERMISSION_CODE = 101
+        private const val TYPING_TIMEOUT = 3000L  // Stop typing indicator after 3 seconds
     }
 
     private lateinit var binding: ActivityChatBinding
@@ -47,9 +54,18 @@ class ChatActivity : AppCompatActivity() {
     private var chatId: String = ""
     private var chatName: String = ""
     private var contactPhone: String = ""
+    private var contactId: String = ""
     private var userName: String = "User"
     private var isAuthenticated = false
     private var isSmsMode = false  // Toggle between Firebase chat and SMS
+    
+    // Typing indicator handling
+    private val typingHandler = Handler(Looper.getMainLooper())
+    private var isTyping = false
+    private val stopTypingRunnable = Runnable {
+        isTyping = false
+        chatRepository.setTypingStatus(chatId, false)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +75,7 @@ class ChatActivity : AppCompatActivity() {
         chatId = intent.getStringExtra(EXTRA_CHAT_ID) ?: ""
         chatName = intent.getStringExtra(EXTRA_CHAT_NAME) ?: "Chat"
         contactPhone = intent.getStringExtra(EXTRA_CONTACT_PHONE) ?: ""
+        contactId = intent.getStringExtra(EXTRA_CONTACT_ID) ?: ""
         val isOnline = intent.getBooleanExtra(EXTRA_IS_ONLINE, false)
 
         Log.d(TAG, "Opening chat: $chatId with $chatName, phone: $contactPhone")
@@ -84,6 +101,7 @@ class ChatActivity : AppCompatActivity() {
         setupUI(chatName, isOnline)
         setupRecyclerView()
         setupListeners()
+        setupTypingIndicator()
         
         // Authenticate first, then observe messages
         authenticateAndObserve()
@@ -100,7 +118,7 @@ class ChatActivity : AppCompatActivity() {
         if (chatRepository.currentUserId != null) {
             Log.d(TAG, "Already authenticated: ${chatRepository.currentUserId}")
             isAuthenticated = true
-            observeMessages()
+            onAuthSuccess()
             return
         }
         
@@ -108,7 +126,7 @@ class ChatActivity : AppCompatActivity() {
             onSuccess = { userId ->
                 Log.d(TAG, "Auth successful: $userId")
                 isAuthenticated = true
-                observeMessages()
+                onAuthSuccess()
             },
             onError = { error ->
                 Log.e(TAG, "Auth failed: $error")
@@ -116,6 +134,82 @@ class ChatActivity : AppCompatActivity() {
                 binding.emptyState.visibility = View.VISIBLE
             }
         )
+    }
+    
+    private fun onAuthSuccess() {
+        observeMessages()
+        observeContactStatus()
+        
+        // Mark messages as seen when chat is opened
+        chatRepository.markMessagesAsSeen(chatId)
+    }
+    
+    private fun observeContactStatus() {
+        if (contactId.isEmpty()) return
+        
+        chatRepository.observeUserStatus(contactId) { isOnline, lastSeen, isTyping ->
+            runOnUiThread {
+                when {
+                    isTyping -> {
+                        binding.tvStatus.text = "typing..."
+                        binding.tvStatus.setTextColor(ContextCompat.getColor(this, R.color.pasig_dark))
+                    }
+                    isOnline -> {
+                        binding.tvStatus.text = "Online"
+                        binding.tvStatus.setTextColor(ContextCompat.getColor(this, R.color.success_green))
+                    }
+                    else -> {
+                        binding.tvStatus.text = formatLastSeen(lastSeen)
+                        binding.tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun formatLastSeen(timestamp: Long): String {
+        if (timestamp == 0L) return "Offline"
+        
+        val now = System.currentTimeMillis()
+        val diff = now - timestamp
+        
+        return when {
+            diff < 60_000 -> "Last seen just now"
+            diff < 3600_000 -> "Last seen ${diff / 60_000}m ago"
+            diff < 86400_000 -> "Last seen ${diff / 3600_000}h ago"
+            else -> {
+                val sdf = java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
+                "Last seen ${sdf.format(java.util.Date(timestamp))}"
+            }
+        }
+    }
+    
+    private fun setupTypingIndicator() {
+        binding.etMessage.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!isSmsMode && isAuthenticated && !s.isNullOrEmpty()) {
+                    // User is typing
+                    if (!isTyping) {
+                        isTyping = true
+                        chatRepository.setTypingStatus(chatId, true)
+                    }
+                    
+                    // Reset typing timeout
+                    typingHandler.removeCallbacks(stopTypingRunnable)
+                    typingHandler.postDelayed(stopTypingRunnable, TYPING_TIMEOUT)
+                }
+            }
+            
+            override fun afterTextChanged(s: Editable?) {
+                if (s.isNullOrEmpty() && isTyping) {
+                    isTyping = false
+                    chatRepository.setTypingStatus(chatId, false)
+                    typingHandler.removeCallbacks(stopTypingRunnable)
+                }
+            }
+        })
     }
 
     private fun setupUI(name: String, isOnline: Boolean) {
@@ -143,8 +237,7 @@ class ChatActivity : AppCompatActivity() {
         } else {
             binding.btnSmsToggle.setColorFilter(ContextCompat.getColor(this, R.color.text_secondary))
             binding.etMessage.hint = "Type a message..."
-            binding.tvStatus.text = if (isAuthenticated) "In-App Chat" else "Connecting..."
-            binding.tvStatus.setTextColor(ContextCompat.getColor(this, R.color.success_green))
+            // Status will be updated by observeContactStatus
         }
     }
 
@@ -173,6 +266,11 @@ class ChatActivity : AppCompatActivity() {
         binding.btnSend.setOnClickListener {
             val message = binding.etMessage.text.toString().trim()
             if (message.isNotEmpty()) {
+                // Stop typing indicator
+                isTyping = false
+                chatRepository.setTypingStatus(chatId, false)
+                typingHandler.removeCallbacks(stopTypingRunnable)
+                
                 if (isSmsMode) {
                     sendSmsMessage(message)
                 } else {
@@ -306,6 +404,9 @@ class ChatActivity : AppCompatActivity() {
                 messageAdapter.submitList(messages)
                 binding.rvMessages.scrollToPosition(messages.size - 1)
             }
+            
+            // Mark new messages as seen
+            chatRepository.markMessagesAsSeen(chatId)
         }
     }
 
@@ -380,6 +481,7 @@ class ChatActivity : AppCompatActivity() {
         super.onResume()
         if (isAuthenticated) {
             chatRepository.setOnlineStatus(true)
+            chatRepository.markMessagesAsSeen(chatId)
         }
     }
 
@@ -387,6 +489,13 @@ class ChatActivity : AppCompatActivity() {
         super.onPause()
         if (isAuthenticated) {
             chatRepository.setOnlineStatus(false)
+            chatRepository.setTypingStatus(chatId, false)
         }
+        typingHandler.removeCallbacks(stopTypingRunnable)
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        typingHandler.removeCallbacks(stopTypingRunnable)
     }
 }

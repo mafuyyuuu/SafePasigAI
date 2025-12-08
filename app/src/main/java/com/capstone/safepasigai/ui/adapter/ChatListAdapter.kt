@@ -3,6 +3,7 @@ package com.capstone.safepasigai.ui.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -34,14 +35,15 @@ class ChatListAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(chat: Chat) {
+            val context = itemView.context
+            
             binding.tvName.text = chat.name
             binding.tvLastMessage.text = chat.lastMessage.ifEmpty { "Start a conversation" }
             binding.tvInitial.text = chat.name.firstOrNull()?.uppercase() ?: "?"
             
-            // Format time
+            // Format time using the Chat's helper method or manual format
             if (chat.lastMessageTime > 0) {
-                val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-                binding.tvTime.text = sdf.format(Date(chat.lastMessageTime))
+                binding.tvTime.text = chat.getFormattedTime()
                 binding.tvTime.visibility = View.VISIBLE
             } else {
                 binding.tvTime.visibility = View.GONE
@@ -51,12 +53,21 @@ class ChatListAdapter(
             if (chat.unreadCount > 0) {
                 binding.tvUnread.text = chat.unreadCount.toString()
                 binding.tvUnread.visibility = View.VISIBLE
+                // Make last message bold when there are unread messages
+                binding.tvLastMessage.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             } else {
                 binding.tvUnread.visibility = View.GONE
+                binding.tvLastMessage.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             }
             
             // Online indicator
             binding.onlineIndicator.visibility = if (chat.isOnline) View.VISIBLE else View.GONE
+            
+            // Typing indicator in last message
+            if (chat.typingUsers.isNotEmpty()) {
+                binding.tvLastMessage.text = "typing..."
+                binding.tvLastMessage.setTextColor(ContextCompat.getColor(context, R.color.pasig_dark))
+            }
             
             // Background tint based on type
             val bgColor = when (chat.type) {
@@ -64,9 +75,7 @@ class ChatListAdapter(
                 ChatType.GROUP -> R.color.orange_bg
                 else -> R.color.pasig_light
             }
-            binding.tvInitial.setBackgroundColor(
-                itemView.context.getColor(bgColor)
-            )
+            binding.tvInitial.setBackgroundColor(context.getColor(bgColor))
             
             itemView.setOnClickListener { onChatClick(chat) }
         }

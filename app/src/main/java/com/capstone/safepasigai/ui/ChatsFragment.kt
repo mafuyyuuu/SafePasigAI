@@ -174,6 +174,7 @@ class ChatsFragment : Fragment() {
             putExtra(ChatActivity.EXTRA_CHAT_NAME, contact.name)
             putExtra(ChatActivity.EXTRA_IS_ONLINE, false)
             putExtra(ChatActivity.EXTRA_CONTACT_PHONE, contact.phone)
+            putExtra(ChatActivity.EXTRA_CONTACT_ID, contact.id)
         }
         startActivity(intent)
     }
@@ -185,6 +186,7 @@ class ChatsFragment : Fragment() {
         if (chatRepository.currentUserId != null) {
             Log.d(TAG, "Already authenticated: ${chatRepository.currentUserId}")
             isAuthenticated = true
+            syncChatsByPhone()
             observeChats()
             return
         }
@@ -206,6 +208,9 @@ class ChatsFragment : Fragment() {
                         isOnline = true
                     )
                     chatRepository.updateUserProfile(chatUser) {}
+                    
+                    // Sync existing chats by phone number
+                    syncChatsByPhone()
                 }
                 
                 observeChats()
@@ -224,6 +229,22 @@ class ChatsFragment : Fragment() {
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
         )
+    }
+    
+    /**
+     * Sync chats by phone number to find existing chats from other devices
+     */
+    private fun syncChatsByPhone() {
+        val profile = userRepository.getProfile()
+        if (profile?.phone.isNullOrEmpty()) {
+            Log.d(TAG, "No phone number in profile, skipping phone sync")
+            return
+        }
+        
+        Log.d(TAG, "Syncing chats by phone: ${profile?.phone}")
+        chatRepository.findChatsByPhone(profile!!.phone) { chatIds ->
+            Log.d(TAG, "Found ${chatIds.size} chats by phone")
+        }
     }
 
     private fun observeChats() {

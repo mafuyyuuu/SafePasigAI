@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.capstone.safepasigai.R
 import com.capstone.safepasigai.data.model.Message
 import com.capstone.safepasigai.data.model.MessageType
+import com.capstone.safepasigai.data.model.MessageStatus
 import com.capstone.safepasigai.databinding.ItemMessageBinding
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,9 +45,27 @@ class MessageAdapter(
             
             binding.tvMessage.text = message.text
             
-            // Format time
+            // Format time with status
             val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-            binding.tvTime.text = sdf.format(Date(message.timestamp))
+            val timeText = sdf.format(Date(message.timestamp))
+            
+            // Add status indicator for sent messages
+            if (isMe) {
+                val statusIcon = when (message.status) {
+                    MessageStatus.SENDING -> "⏳"
+                    MessageStatus.SENT -> "✓"
+                    MessageStatus.DELIVERED -> "✓✓"
+                    MessageStatus.SEEN -> "✓✓"
+                }
+                binding.tvTime.text = "$timeText $statusIcon"
+                
+                // Blue check marks for seen
+                if (message.status == MessageStatus.SEEN) {
+                    binding.tvTime.setTextColor(ContextCompat.getColor(context, R.color.pasig_light))
+                }
+            } else {
+                binding.tvTime.text = timeText
+            }
             
             // Sender name (only for received messages)
             if (!isMe && message.senderName.isNotEmpty()) {

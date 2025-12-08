@@ -6,12 +6,14 @@ import com.capstone.safepasigai.data.model.ChatType
 import com.capstone.safepasigai.data.model.ChatUser
 import com.capstone.safepasigai.data.model.Message
 import com.capstone.safepasigai.data.model.MessageType
+import com.capstone.safepasigai.data.model.MessageStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ChildEventListener
 
 import com.capstone.safepasigai.SafePasigApplication
 
@@ -39,6 +41,7 @@ class ChatRepository {
         private const val MESSAGES = "messages"
         private const val USERS = "users"
         private const val USER_CHATS = "user_chats"
+        private const val PRESENCE = "presence"
     }
 
     private val database: FirebaseDatabase by lazy {
@@ -66,6 +69,7 @@ class ChatRepository {
         // Check if already signed in
         auth.currentUser?.let { user ->
             Log.d(TAG, "Already signed in: ${user.uid}")
+            setupPresence(user.uid)
             onSuccess(user.uid)
             return
         }
@@ -74,6 +78,7 @@ class ChatRepository {
             .addOnSuccessListener { result ->
                 val userId = result.user?.uid ?: ""
                 Log.d(TAG, "Signed in anonymously: $userId")
+                setupPresence(userId)
                 onSuccess(userId)
             }
             .addOnFailureListener { e ->
@@ -88,6 +93,33 @@ class ChatRepository {
                 }
                 onError(errorMsg)
             }
+    }
+    
+    /**
+     * Setup presence system for online/offline status
+     */
+    private fun setupPresence(userId: String) {
+        val presenceRef = database.reference.child(USERS).child(userId)
+        val connectedRef = database.getReference(".info/connected")
+        
+        connectedRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+                if (connected) {
+                    // When connected, update online status
+                    presenceRef.child("isOnline").setValue(true)
+                    presenceRef.child("lastSeen").setValue(ServerValue.TIMESTAMP)
+                    
+                    // When disconnected, update offline status
+                    presenceRef.child("isOnline").onDisconnect().setValue(false)
+                    presenceRef.child("lastSeen").onDisconnect().setValue(ServerValue.TIMESTAMP)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Presence listener cancelled: ${error.message}")
+            }
+        })
     }
 
     /**
@@ -114,6 +146,39 @@ class ChatRepository {
         )
         
         database.reference.child(USERS).child(userId).updateChildren(updates)
+    }
+    
+    /**
+     * Set typing status for a chat
+     */
+    fun setTypingStatus(chatId: String, isTyping: Boolean) {
+        val userId = currentUserId ?: return
+        
+        database.reference.child(USERS).child(userId).updateChildren(
+            mapOf(
+                "isTyping" to isTyping,
+                "typingInChat" to if (isTyping) chatId else ""
+            )
+        )
+    }
+    
+    /**
+     * Observe a user's online status and typing status
+     */
+    fun observeUserStatus(userId: String, onStatusChanged: (isOnline: Boolean, lastSeen: Long, isTyping: Boolean) -> Unit) {
+        database.reference.child(USERS).child(userId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val isOnline = snapshot.child("isOnline").getValue(Boolean::class.java) ?: false
+                    val lastSeen = snapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
+                    val isTyping = snapshot.child("isTyping").getValue(Boolean::class.java) ?: false
+                    onStatusChanged(isOnline, lastSeen, isTyping)
+                }
+                
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e(TAG, "User status listener cancelled: ${error.message}")
+                }
+            })
     }
 
     // ==================== CHATS ====================
@@ -255,7 +320,10 @@ class ChatRepository {
      * Get or create a chat using PHONE NUMBER as the shared identifier.
      * This allows two phones with each other's contacts to chat in the same room.
      * 
-     * Chat ID format: "chat_PHONE1_PHONE2" (sorted alphabetically)
+     * Chat ID format: "chat_PHONE1_PHONE2" (sorted alphabetically, digits only)
+     * 
+     * IMPORTANT: Both phones will use the SAME chat ID because it's based on
+     * sorted phone numbers, not Firebase User IDs.
      */
     fun getOrCreateChatByPhone(
         myPhone: String,
@@ -278,10 +346,14 @@ class ChatRepository {
         val normalizedContactPhone = normalizePhone(contactPhone)
         
         // Create deterministic chat ID based on sorted phone numbers
-        val phones = listOf(normalizedMyPhone, normalizedContactPhone).sorted()
+        // Use only digits to ensure same ID regardless of formatting
+        val myDigits = normalizedMyPhone.filter { it.isDigit() }.takeLast(10)
+        val contactDigits = normalizedContactPhone.filter { it.isDigit() }.takeLast(10)
+        
+        val phones = listOf(myDigits, contactDigits).sorted()
         val chatId = "chat_${phones[0]}_${phones[1]}"
         
-        Log.d(TAG, "Looking for phone-based chat: $chatId")
+        Log.d(TAG, "Looking for phone-based chat: $chatId (my: $myDigits, contact: $contactDigits)")
         
         // Check if chat already exists
         database.reference.child(CHATS).child(chatId)
@@ -290,12 +362,12 @@ class ChatRepository {
                 if (snapshot.exists()) {
                     Log.d(TAG, "Found existing phone chat: $chatId")
                     // Chat exists, add current user if not already participant
-                    addUserToChat(chatId, userId)
+                    addUserToChat(chatId, userId, normalizedMyPhone)
                     onSuccess(chatId)
                 } else {
                     Log.d(TAG, "Creating new phone chat: $chatId")
                     // Create new chat with deterministic ID
-                    createChatWithId(chatId, contactName, userId, onSuccess, onError)
+                    createChatWithId(chatId, contactName, userId, normalizedMyPhone, normalizedContactPhone, onSuccess, onError)
                 }
             }
             .addOnFailureListener { e ->
@@ -319,6 +391,8 @@ class ChatRepository {
         chatId: String,
         name: String,
         userId: String,
+        myPhone: String,
+        contactPhone: String,
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -327,6 +401,7 @@ class ChatRepository {
             name = name,
             type = ChatType.CONTACT,
             participants = listOf(userId),
+            participantPhones = listOf(myPhone, contactPhone), // Store both phone numbers
             lastMessageTime = System.currentTimeMillis()
         )
         
@@ -339,6 +414,16 @@ class ChatRepository {
                     .child(chatId)
                     .setValue(true)
                 
+                // Also index by phone number so the other user can find it
+                database.reference.child("phone_chats")
+                    .child(myPhone.filter { it.isDigit() }.takeLast(10))
+                    .child(chatId)
+                    .setValue(true)
+                database.reference.child("phone_chats")
+                    .child(contactPhone.filter { it.isDigit() }.takeLast(10))
+                    .child(chatId)
+                    .setValue(true)
+                
                 Log.d(TAG, "Chat created with ID: $chatId")
                 onSuccess(chatId)
             }
@@ -348,7 +433,7 @@ class ChatRepository {
             }
     }
     
-    private fun addUserToChat(chatId: String, userId: String) {
+    private fun addUserToChat(chatId: String, userId: String, userPhone: String = "") {
         // Add user to participants
         database.reference.child(CHATS).child(chatId).child("participants")
             .get()
@@ -365,6 +450,47 @@ class ChatRepository {
             .child(userId)
             .child(chatId)
             .setValue(true)
+        
+        // Also index by phone if provided
+        if (userPhone.isNotEmpty()) {
+            database.reference.child("phone_chats")
+                .child(userPhone.filter { it.isDigit() }.takeLast(10))
+                .child(chatId)
+                .setValue(true)
+        }
+    }
+    
+    /**
+     * Find chats for a user by their phone number.
+     * This helps when a user reinstalls the app or gets a new Firebase User ID.
+     */
+    fun findChatsByPhone(phone: String, onComplete: (List<String>) -> Unit) {
+        val phoneDigits = phone.filter { it.isDigit() }.takeLast(10)
+        
+        database.reference.child("phone_chats").child(phoneDigits)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val chatIds = snapshot.children.mapNotNull { it.key }
+                
+                // Add these chats to the current user's chat list
+                val userId = currentUserId
+                if (userId != null) {
+                    chatIds.forEach { chatId ->
+                        database.reference.child(USER_CHATS)
+                            .child(userId)
+                            .child(chatId)
+                            .setValue(true)
+                        
+                        // Also add to participants
+                        addUserToChat(chatId, userId, phone)
+                    }
+                }
+                
+                onComplete(chatIds)
+            }
+            .addOnFailureListener {
+                onComplete(emptyList())
+            }
     }
 
     // ==================== MESSAGES ====================
@@ -381,12 +507,65 @@ class ChatRepository {
                         it.getValue(Message::class.java)?.copy(id = it.key ?: "")
                     }
                     onMessagesUpdated(messages)
+                    
+                    // Mark messages as delivered for current user
+                    markMessagesAsDelivered(chatId, messages)
                 }
 
                 override fun onCancelled(error: DatabaseError) {
                     Log.e(TAG, "Failed to observe messages: ${error.message}")
                 }
             })
+    }
+    
+    /**
+     * Mark messages as delivered when received
+     */
+    private fun markMessagesAsDelivered(chatId: String, messages: List<Message>) {
+        val userId = currentUserId ?: return
+        
+        messages.filter { 
+            it.senderId != userId && it.status == MessageStatus.SENT 
+        }.forEach { message ->
+            database.reference.child(MESSAGES).child(chatId).child(message.id)
+                .updateChildren(mapOf(
+                    "status" to MessageStatus.DELIVERED.name,
+                    "deliveredAt" to ServerValue.TIMESTAMP
+                ))
+        }
+    }
+    
+    /**
+     * Mark messages as seen when chat is opened
+     */
+    fun markMessagesAsSeen(chatId: String) {
+        val userId = currentUserId ?: return
+        
+        database.reference.child(MESSAGES).child(chatId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                snapshot.children.forEach { messageSnapshot ->
+                    val message = messageSnapshot.getValue(Message::class.java)
+                    if (message != null && 
+                        message.senderId != userId && 
+                        message.status != MessageStatus.SEEN) {
+                        
+                        val seenBy = message.seenBy.toMutableList()
+                        if (!seenBy.contains(userId)) {
+                            seenBy.add(userId)
+                        }
+                        
+                        messageSnapshot.ref.updateChildren(mapOf(
+                            "status" to MessageStatus.SEEN.name,
+                            "seenAt" to ServerValue.TIMESTAMP,
+                            "seenBy" to seenBy
+                        ))
+                    }
+                }
+                
+                // Reset unread count
+                database.reference.child(CHATS).child(chatId).child("unreadCount").setValue(0)
+            }
     }
 
     /**
@@ -411,13 +590,14 @@ class ChatRepository {
             senderName = senderName,
             text = text,
             timestamp = System.currentTimeMillis(),
-            type = MessageType.TEXT
+            type = MessageType.TEXT,
+            status = MessageStatus.SENT
         )
         
         messageRef.setValue(message)
             .addOnSuccessListener {
                 // Update chat's last message
-                updateChatLastMessage(chatId, text)
+                updateChatLastMessage(chatId, text, userId)
                 onSuccess()
             }
             .addOnFailureListener { e ->
@@ -449,13 +629,14 @@ class ChatRepository {
             text = "📍 Location shared",
             timestamp = System.currentTimeMillis(),
             type = MessageType.LOCATION,
+            status = MessageStatus.SENT,
             locationLat = lat,
             locationLng = lng
         )
         
         messageRef.setValue(message)
             .addOnSuccessListener {
-                updateChatLastMessage(chatId, "📍 Location shared")
+                updateChatLastMessage(chatId, "📍 Location shared", userId)
                 onSuccess()
             }
             .addOnFailureListener { e ->
@@ -488,13 +669,14 @@ class ChatRepository {
             text = "🚨 EMERGENCY ALERT: $alertType",
             timestamp = System.currentTimeMillis(),
             type = MessageType.ALERT,
+            status = MessageStatus.SENT,
             locationLat = lat,
             locationLng = lng
         )
         
         messageRef.setValue(message)
             .addOnSuccessListener {
-                updateChatLastMessage(chatId, "🚨 EMERGENCY ALERT")
+                updateChatLastMessage(chatId, "🚨 EMERGENCY ALERT", userId)
                 onSuccess()
             }
             .addOnFailureListener { e ->
@@ -502,12 +684,24 @@ class ChatRepository {
             }
     }
 
-    private fun updateChatLastMessage(chatId: String, lastMessage: String) {
+    private fun updateChatLastMessage(chatId: String, lastMessage: String, senderId: String) {
         val updates = mapOf(
             "lastMessage" to lastMessage,
-            "lastMessageTime" to ServerValue.TIMESTAMP
+            "lastMessageTime" to ServerValue.TIMESTAMP,
+            "lastMessageSenderId" to senderId
         )
         database.reference.child(CHATS).child(chatId).updateChildren(updates)
+        
+        // Increment unread count for other participants
+        database.reference.child(CHATS).child(chatId).child("participants")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                snapshot.children.mapNotNull { it.getValue(String::class.java) }
+                    .filter { it != senderId }
+                    .forEach { participantId ->
+                        // This could be enhanced to track per-user unread counts
+                    }
+            }
     }
 
     // ==================== BARANGAY RESPONDERS ====================
