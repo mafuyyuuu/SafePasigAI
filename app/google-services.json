@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "988945511188",
+    "project_id": "safepasigai",
+    "storage_bucket": "safepasigai.firebasestorage.app",
+    "firebase_url": "https://safepasigai-default-rtdb.asia-southeast1.firebasedatabase.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988945511188:android:823795329efc609b090801",
+        "android_client_info": {
+          "package_name": "com.capstone.safepasigai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBqFzKub8TxFoaISWc-sKmOI4K2SMwSa8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

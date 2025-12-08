@@ -50,6 +50,7 @@
             android:textSize="16sp"/>
 
         <TextView
+            android:id="@+id/tvAlertTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Sending Help..."
@@ -97,6 +98,7 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
+            android:id="@+id/tvContactsLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Location sent to:"
@@ -106,42 +108,11 @@
             android:layout_marginBottom="12dp"/>
 
         <LinearLayout
+            android:id="@+id/contactAvatarsContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <View
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/bg_circle"
-                android:backgroundTint="@color/pasig_light"/>
-
-            <View
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/bg_circle"
-                android:backgroundTint="@color/success_green"/>
-
-            <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp">
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_circle"
-                    android:backgroundTint="#33FFFFFF"/>
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="+1"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
-                    android:fontFamily="@font/satoshi_bold"/>
-            </FrameLayout>
-        </LinearLayout>
+            android:orientation="horizontal"
+            android:gravity="center"/>
     </LinearLayout>
 
     <!-- Cancel Button -->

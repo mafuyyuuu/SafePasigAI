@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -50,15 +51,34 @@ dependencies {
     implementation("androidx.activity:activity:1.9.0")
     implementation("androidx.fragment:fragment-ktx:1.8.0")
     implementation("androidx.cardview:cardview:1.0.0")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
 
     // PHASE 2 & 3: Maps & Location
-    implementation("com.google.android.gms:play-services-maps:19.0.0")
+    // OSMDroid - FREE OpenStreetMap (no API key required!)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // PHASE 2: TensorFlow Lite (AI)
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-metadata:0.4.4")
     implementation("org.tensorflow:tensorflow-lite-task-audio:0.4.4")
+
+    // Firebase - Chat & Realtime Database (explicit versions)
+    implementation("com.google.firebase:firebase-database-ktx:21.0.0")
+    implementation("com.google.firebase:firebase-auth-ktx:23.1.0")
+    implementation("com.google.firebase:firebase-messaging-ktx:24.1.0")
+
+    // RecyclerView for chat lists
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    
+    // Gson for JSON serialization
+    implementation("com.google.code.gson:gson:2.10.1")
+    
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    
+    // UCrop for image cropping (1:1 ratio for avatars)
+    implementation("com.github.yalantis:ucrop:2.2.8")
 
     // Testing
     testImplementation(libs.junit)

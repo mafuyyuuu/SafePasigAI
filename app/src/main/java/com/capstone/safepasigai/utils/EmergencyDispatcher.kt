@@ -197,11 +197,22 @@ object EmergencyDispatcher {
     }
     
     /**
-     * Get emergency contacts from SharedPreferences.
+     * Get emergency contacts from ContactsRepository.
      */
     fun getEmergencyContacts(context: Context): List<String> {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // Try new ContactsRepository first
+        try {
+            val repository = com.capstone.safepasigai.data.repository.ContactsRepository(context)
+            val contacts = repository.getSOSContacts()
+            if (contacts.isNotEmpty()) {
+                return contacts.map { it.phone }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "ContactsRepository not available, falling back to SharedPreferences")
+        }
         
+        // Fallback to legacy SharedPreferences
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return listOfNotNull(
             prefs.getString(KEY_CONTACT_1, null),
             prefs.getString(KEY_CONTACT_2, null),

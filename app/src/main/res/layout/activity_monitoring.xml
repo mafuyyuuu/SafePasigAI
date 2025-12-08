@@ -4,13 +4,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/map_bg">
+    android:background="@color/pasig_bg">
 
-    <!-- Map Grid Pattern Background -->
-    <View
+    <!-- OSMDroid Free Map -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.3"/>
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <!-- Back Button -->
     <com.google.android.material.card.MaterialCardView
@@ -18,7 +20,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_marginStart="24dp"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="48dp"
         app:cardCornerRadius="20dp"
         app:cardElevation="8dp"
         app:layout_constraintStart_toStartOf="parent"
@@ -37,13 +39,12 @@
         android:id="@+id/statusPill"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="44dp"
-        app:cardBackgroundColor="#E6FFFFFF"
+        android:layout_marginTop="48dp"
+        android:layout_marginEnd="24dp"
+        app:cardBackgroundColor="@color/white"
         app:cardCornerRadius="16dp"
         app:cardElevation="8dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.9"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
@@ -55,12 +56,14 @@
             android:paddingVertical="8dp">
 
             <View
+                android:id="@+id/statusDot"
                 android:layout_width="8dp"
                 android:layout_height="8dp"
                 android:background="@drawable/bg_white_rounded"
                 android:backgroundTint="@color/success_green" />
 
             <TextView
+                android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
@@ -70,35 +73,27 @@
                 android:textSize="12sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-
-    <!-- Center Pulse Circle -->
-    <View
-        android:id="@+id/pulseCircle"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
-        android:background="@drawable/bg_white_rounded"
-        android:backgroundTint="#333B82F6"
+    
+    <!-- Re-center Map Button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnRecenter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:src="@drawable/ic_location"
+        app:backgroundTint="@color/white"
+        app:fabSize="mini"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/statusPill"/>
-
-    <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:src="@android:drawable/ic_btn_speak_now"
-        app:tint="@color/pasig_light"
-        app:layout_constraintBottom_toBottomOf="@id/pulseCircle"
-        app:layout_constraintEnd_toEndOf="@id/pulseCircle"
-        app:layout_constraintStart_toStartOf="@id/pulseCircle"
-        app:layout_constraintTop_toTopOf="@id/pulseCircle"/>
+        app:tint="@color/pasig_dark" />
 
     <!-- Bottom Sheet -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottomSheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="40dp"
+        app:cardCornerRadius="32dp"
         app:cardElevation="16dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
@@ -106,7 +101,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="32dp">
+            android:padding="24dp">
 
             <!-- Handle -->
             <View
@@ -114,8 +109,8 @@
                 android:layout_height="4dp"
                 android:layout_gravity="center"
                 android:background="@drawable/bg_white_rounded"
-                android:backgroundTint="@color/gray_100"
-                android:layout_marginBottom="24dp"/>
+                android:backgroundTint="@color/gray_200"
+                android:layout_marginBottom="16dp"/>
 
             <!-- Header Row -->
             <LinearLayout
@@ -123,7 +118,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="32dp">
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -134,37 +129,106 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Escort Active"
+                        android:text="Smart Escort Active"
                         android:fontFamily="@font/satoshi_bold"
                         android:textColor="@color/pasig_dark"
-                        android:textSize="24sp"/>
+                        android:textSize="20sp"/>
 
                     <TextView
+                        android:id="@+id/tvMonitoringStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Monitoring Environment..."
+                        android:text="Monitoring your safety..."
                         android:fontFamily="@font/satoshi_medium"
                         android:textColor="@color/text_secondary"
-                        android:textSize="14sp"/>
+                        android:textSize="13sp"/>
                 </LinearLayout>
 
-                <FrameLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content">
-                    <View
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:background="@drawable/bg_white_rounded"
-                        android:backgroundTint="@color/blue_bg"/>
+                <!-- Clickable Mic Button -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnMic"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    app:cardCornerRadius="24dp"
+                    app:cardBackgroundColor="@color/blue_bg">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:id="@+id/ivMic"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_mic"
-                        app:tint="@color/pasig_light"/>
-                </FrameLayout>
+                        app:tint="@color/pasig_dark"/>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
+            
+            <!-- Status Info -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/pasig_bg"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp">
+                
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+                    
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        
+                        <TextView
+                            android:id="@+id/tvAudioStatus"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/satoshi_medium"
+                            android:text="Voice: Starting..."
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                        
+                        <TextView
+                            android:id="@+id/tvLocationStatus"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/satoshi_medium"
+                            android:text="GPS: Starting..."
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                    
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="@color/gray_200" />
+                    
+                    <TextView
+                        android:id="@+id/tvLocation"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/satoshi_regular"
+                        android:text="Waiting for GPS..."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+                    
+                    <TextView
+                        android:id="@+id/tvLastUpdate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:fontFamily="@font/satoshi_regular"
+                        android:text="Last update: --"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Buttons Row -->
             <LinearLayout

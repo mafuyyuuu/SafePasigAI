@@ -27,6 +27,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.capstone.safepasigai.R
+import com.capstone.safepasigai.data.repository.SettingsRepository
 import com.capstone.safepasigai.ui.MonitoringActivity
 import com.capstone.safepasigai.ui.SOSActivity
 import org.tensorflow.lite.support.audio.TensorAudio
@@ -79,12 +80,22 @@ class SmartEscortService : Service(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var vibrator: Vibrator? = null
     
+    // Settings Repository
+    private lateinit var settingsRepository: SettingsRepository
+    
     // Audio AI
     private var audioClassifier: AudioClassifier? = null
     private var tensorAudio: TensorAudio? = null
     private var audioRecord: AudioRecord? = null
     private var audioExecutor: ScheduledExecutorService? = null
-    private var isAudioEnabled = false
+    @Volatile private var isAudioEnabled = false
+    @Volatile private var isAudioInitialized = false
+    @Volatile private var isFallDetectionEnabled = true
+    
+    // Location Tracking
+    private var locationTracker: LocationTracker? = null
+    private var currentSessionId: String? = null
+    private var currentLocation: android.location.Location? = null
     
     // State
     private var isMonitoring = false
@@ -93,6 +104,7 @@ class SmartEscortService : Service(), SensorEventListener {
     // Callbacks
     private var dangerCallback: ((String) -> Unit)? = null
     private var statusCallback: ((String) -> Unit)? = null
+    private var locationCallback: ((android.location.Location) -> Unit)? = null
 
     inner class LocalBinder : Binder() {
         fun getService(): SmartEscortService = this@SmartEscortService
@@ -104,9 +116,24 @@ class SmartEscortService : Service(), SensorEventListener {
         super.onCreate()
         Log.d(TAG, "Service created")
         
+        settingsRepository = SettingsRepository(this)
+        
+        // Load settings
+        isFallDetectionEnabled = settingsRepository.isFallDetectionEnabled()
+        isAudioEnabled = settingsRepository.isVoiceDetectionEnabled()
+        
         initializeSensors()
-        initializeAudioClassifier()
+        initializeLocationTracker()
         createNotificationChannel()
+        
+        // Initialize audio classifier on background thread (heavy I/O)
+        Executors.newSingleThreadExecutor().execute {
+            initializeAudioClassifier()
+        }
+    }
+
+    private fun initializeLocationTracker() {
+        locationTracker = LocationTracker(this)
     }
 
     private fun initializeSensors() {
@@ -129,6 +156,7 @@ class SmartEscortService : Service(), SensorEventListener {
             if (!modelExists) {
                 Log.w(TAG, "Audio model '$MODEL_FILE' not found. Voice detection disabled.")
                 isAudioEnabled = false
+                isAudioInitialized = true
                 return
             }
             
@@ -137,6 +165,7 @@ class SmartEscortService : Service(), SensorEventListener {
                 != PackageManager.PERMISSION_GRANTED) {
                 Log.w(TAG, "RECORD_AUDIO permission not granted. Voice detection disabled.")
                 isAudioEnabled = false
+                isAudioInitialized = true
                 return
             }
             
@@ -144,11 +173,18 @@ class SmartEscortService : Service(), SensorEventListener {
             tensorAudio = audioClassifier?.createInputTensorAudio()
             
             isAudioEnabled = true
+            isAudioInitialized = true
             Log.d(TAG, "Audio classifier initialized successfully")
+            
+            // If monitoring already started, start audio classification now
+            if (isMonitoring) {
+                startAudioClassification()
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize audio classifier: ${e.message}")
             isAudioEnabled = false
+            isAudioInitialized = true
         }
     }
 
@@ -168,6 +204,9 @@ class SmartEscortService : Service(), SensorEventListener {
         Log.d(TAG, "Starting Smart Escort monitoring...")
         isMonitoring = true
         
+        // Generate session ID
+        currentSessionId = "session_${System.currentTimeMillis()}"
+        
         // 1. Acquire Wake Lock (keeps CPU running when screen off)
         acquireWakeLock()
         
@@ -184,12 +223,18 @@ class SmartEscortService : Service(), SensorEventListener {
             startAudioClassification()
         }
         
+        // 5. Start location tracking
+        startLocationTracking()
+        
         statusCallback?.invoke("ACTIVE")
     }
 
     private fun stopMonitoring() {
         Log.d(TAG, "Stopping Smart Escort monitoring...")
         isMonitoring = false
+        
+        // Stop location tracking
+        stopLocationTracking()
         
         // Stop audio classification
         stopAudioClassification()
@@ -204,7 +249,45 @@ class SmartEscortService : Service(), SensorEventListener {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         
+        currentSessionId = null
         statusCallback?.invoke("STOPPED")
+    }
+    
+    // ==================== LOCATION TRACKING ====================
+    
+    private fun startLocationTracking() {
+        val userId = getUserId()
+        val sessionId = currentSessionId ?: return
+        
+        locationTracker?.startTracking(
+            userId = userId,
+            sessionId = sessionId,
+            onUpdate = { location ->
+                currentLocation = location
+                locationCallback?.invoke(location)
+            }
+        )
+        Log.d(TAG, "Location tracking started")
+    }
+    
+    private fun stopLocationTracking() {
+        locationTracker?.stopTracking()
+        Log.d(TAG, "Location tracking stopped")
+    }
+    
+    private fun getUserId(): String {
+        // Try to get Firebase user ID, fallback to device ID
+        return try {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                ?: getSharedPreferences("user", Context.MODE_PRIVATE)
+                    .getString("device_id", null)
+                ?: java.util.UUID.randomUUID().toString().also { deviceId ->
+                    getSharedPreferences("user", Context.MODE_PRIVATE)
+                        .edit().putString("device_id", deviceId).apply()
+                }
+        } catch (e: Exception) {
+            java.util.UUID.randomUUID().toString()
+        }
     }
 
     // ==================== WAKE LOCK ====================
@@ -233,7 +316,7 @@ class SmartEscortService : Service(), SensorEventListener {
     // ==================== ACCELEROMETER ====================
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (!isMonitoring) return
+        if (!isMonitoring || !isFallDetectionEnabled) return
         
         event?.let {
             if (it.sensor.type == Sensor.TYPE_ACCELEROMETER) {
@@ -255,7 +338,11 @@ class SmartEscortService : Service(), SensorEventListener {
     // ==================== AUDIO CLASSIFICATION ====================
 
     private fun startAudioClassification() {
-        if (!isAudioEnabled || audioClassifier == null) return
+        // Wait for async initialization to complete
+        if (!isAudioInitialized || !isAudioEnabled || audioClassifier == null) return
+        
+        // Avoid duplicate starts
+        if (audioExecutor != null) return
         
         try {
             audioRecord = audioClassifier?.createAudioRecord()
@@ -409,12 +496,50 @@ class SmartEscortService : Service(), SensorEventListener {
         statusCallback = callback
     }
     
+    fun setLocationCallback(callback: (android.location.Location) -> Unit) {
+        locationCallback = callback
+    }
+    
     fun isCurrentlyMonitoring(): Boolean = isMonitoring
     
     fun isAudioDetectionEnabled(): Boolean = isAudioEnabled
+    
+    fun isLocationTrackingEnabled(): Boolean = locationTracker?.isCurrentlyTracking() ?: false
+    
+    fun getCurrentLocation(): android.location.Location? = currentLocation
+    
+    fun getSessionId(): String? = currentSessionId
+    
+    /**
+     * Enable or disable voice detection at runtime.
+     */
+    fun setVoiceDetectionEnabled(enabled: Boolean) {
+        if (enabled && !isAudioEnabled) {
+            // Enable - try to start audio classification
+            isAudioEnabled = true
+            if (isMonitoring && isAudioInitialized) {
+                startAudioClassification()
+            }
+        } else if (!enabled && isAudioEnabled) {
+            // Disable - stop audio classification
+            isAudioEnabled = false
+            stopAudioClassification()
+        }
+    }
+    
+    /**
+     * Enable or disable fall detection at runtime.
+     */
+    fun setFallDetectionEnabled(enabled: Boolean) {
+        isFallDetectionEnabled = enabled
+        settingsRepository.setFallDetectionEnabled(enabled)
+    }
+    
+    fun isFallDetectionCurrentlyEnabled(): Boolean = isFallDetectionEnabled
 
     override fun onDestroy() {
         super.onDestroy()
+        stopLocationTracking()
         stopAudioClassification()
         sensorManager.unregisterListener(this)
         releaseWakeLock()

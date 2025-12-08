@@ -12,7 +12,65 @@
         <!-- Primary colors -->
         <item name="colorPrimary">@color/pasig_dark</item>
         <item name="colorPrimaryContainer">@color/pasig_light</item>
+        
+        <!-- Dialog styling -->
+        <item name="alertDialogTheme">@style/SafePasigAlertDialog</item>
+        <item name="materialAlertDialogTheme">@style/SafePasigMaterialDialog</item>
     </style>
 
     <style name="Theme.SafePasigAI" parent="Base.Theme.SafePasigAI" />
+    
+    <!-- Custom Alert Dialog Style -->
+    <style name="SafePasigAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:background">@color/white</item>
+        <item name="dialogCornerRadius">24dp</item>
+        <item name="buttonBarPositiveButtonStyle">@style/SafePasigDialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/SafePasigDialogButtonSecondary</item>
+        <item name="buttonBarNeutralButtonStyle">@style/SafePasigDialogButtonNeutral</item>
+    </style>
+    
+    <!-- Material Alert Dialog Style -->
+    <style name="SafePasigMaterialDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/DialogShapeAppearance</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorPrimary">@color/pasig_dark</item>
+        <item name="buttonBarPositiveButtonStyle">@style/SafePasigDialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/SafePasigDialogButtonSecondary</item>
+        <item name="buttonBarNeutralButtonStyle">@style/SafePasigDialogButtonNeutral</item>
+    </style>
+    
+    <!-- Dialog Shape -->
+    <style name="DialogShapeAppearance" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+    
+    <!-- Primary Dialog Button -->
+    <style name="SafePasigDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/pasig_dark</item>
+        <item name="android:fontFamily">@font/satoshi_bold</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    
+    <!-- Secondary Dialog Button -->
+    <style name="SafePasigDialogButtonSecondary" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:fontFamily">@font/satoshi_medium</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    
+    <!-- Neutral Dialog Button -->
+    <style name="SafePasigDialogButtonNeutral" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/pasig_light</item>
+        <item name="android:fontFamily">@font/satoshi_medium</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    
+    <!-- NumberPicker Theme -->
+    <style name="NumberPickerTheme">
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textSize">18sp</item>
+    </style>
 </resources>
