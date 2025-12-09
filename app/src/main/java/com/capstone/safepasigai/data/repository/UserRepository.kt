@@ -83,4 +83,11 @@ class UserRepository(context: Context) {
     fun clearData() {
         prefs.edit().clear().apply()
     }
+    
+    /**
+     * Clear all user data including related storage.
+     */
+    fun clearAllData() {
+        prefs.edit().clear().apply()
+    }
 }

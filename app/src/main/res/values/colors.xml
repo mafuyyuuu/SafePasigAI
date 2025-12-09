@@ -21,6 +21,7 @@
     <color name="success_green">#10B981</color>
     <color name="success_bg">#DCFCE7</color>
     <color name="warning_amber">#F59E0B</color>
+    <color name="orange">#F97316</color>
     <color name="orange_500">#F97316</color>
     <color name="orange_bg">#FFF7ED</color>
     <color name="blue_bg">#EFF6FF</color>

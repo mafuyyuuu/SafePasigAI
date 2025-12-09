@@ -20,6 +20,18 @@
 
     <style name="Theme.SafePasigAI" parent="Base.Theme.SafePasigAI" />
     
+    <!-- Splash Screen Theme -->
+    <style name="Theme.SafePasigAI.Splash" parent="Theme.SplashScreen">
+        <!-- Splash screen background color -->
+        <item name="windowSplashScreenBackground">@color/pasig_dark</item>
+        <!-- App icon displayed in center of splash screen -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/logo_transparent</item>
+        <!-- Duration of icon animation (optional, max 1000ms) -->
+        <item name="windowSplashScreenAnimationDuration">500</item>
+        <!-- Theme to apply after splash screen -->
+        <item name="postSplashScreenTheme">@style/Theme.SafePasigAI</item>
+    </style>
+    
     <!-- Custom Alert Dialog Style -->
     <style name="SafePasigAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:background">@color/white</item>

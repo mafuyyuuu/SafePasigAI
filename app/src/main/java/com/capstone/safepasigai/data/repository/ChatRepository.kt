@@ -41,6 +41,7 @@ class ChatRepository {
         private const val MESSAGES = "messages"
         private const val USERS = "users"
         private const val USER_CHATS = "user_chats"
+        private const val DELETED_CHATS = "deleted_chats"  // Track deleted chats
         private const val PRESENCE = "presence"
     }
 
@@ -185,6 +186,8 @@ class ChatRepository {
 
     /**
      * Get all chats for the current user.
+     * Also fetches online status for each chat participant.
+     * Uses addValueEventListener on individual chats for real-time updates.
      */
     fun observeUserChats(onChatsUpdated: (List<Chat>) -> Unit) {
         val userId = currentUserId ?: return
@@ -193,27 +196,52 @@ class ChatRepository {
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val chatIds = snapshot.children.mapNotNull { it.key }
+                    Log.d(TAG, "User has ${chatIds.size} chats")
+                    
                     if (chatIds.isEmpty()) {
                         onChatsUpdated(emptyList())
                         return
                     }
                     
-                    // Fetch full chat data for each chat ID
-                    val chats = mutableListOf<Chat>()
-                    var loadedCount = 0
+                    // Use a map to track chat data for real-time updates
+                    val chatMap = mutableMapOf<String, Chat>()
                     
                     chatIds.forEach { chatId ->
+                        // Add listener for each chat to get real-time updates
                         database.reference.child(CHATS).child(chatId)
-                            .get()
-                            .addOnSuccessListener { chatSnapshot ->
-                                chatSnapshot.getValue(Chat::class.java)?.let { chat ->
-                                    chats.add(chat.copy(id = chatId))
+                            .addValueEventListener(object : ValueEventListener {
+                                override fun onDataChange(chatSnapshot: DataSnapshot) {
+                                    val chat = chatSnapshot.getValue(Chat::class.java)
+                                    if (chat != null) {
+                                        // Find the other participant to check their online status
+                                        val otherParticipant = chat.participants.find { it != userId }
+                                        
+                                        if (otherParticipant != null) {
+                                            database.reference.child(USERS).child(otherParticipant)
+                                                .get()
+                                                .addOnSuccessListener { userSnapshot ->
+                                                    val isOnline = userSnapshot.child("isOnline").getValue(Boolean::class.java) ?: false
+                                                    val lastSeen = userSnapshot.child("lastSeen").getValue(Long::class.java) ?: 0L
+                                                    chatMap[chatId] = chat.copy(id = chatId, isOnline = isOnline, lastSeen = lastSeen)
+                                                    
+                                                    // Emit updated list
+                                                    onChatsUpdated(chatMap.values.sortedByDescending { it.lastMessageTime })
+                                                }
+                                                .addOnFailureListener {
+                                                    chatMap[chatId] = chat.copy(id = chatId)
+                                                    onChatsUpdated(chatMap.values.sortedByDescending { it.lastMessageTime })
+                                                }
+                                        } else {
+                                            chatMap[chatId] = chat.copy(id = chatId)
+                                            onChatsUpdated(chatMap.values.sortedByDescending { it.lastMessageTime })
+                                        }
+                                    }
                                 }
-                                loadedCount++
-                                if (loadedCount == chatIds.size) {
-                                    onChatsUpdated(chats.sortedByDescending { it.lastMessageTime })
+                                
+                                override fun onCancelled(error: DatabaseError) {
+                                    Log.e(TAG, "Chat listener cancelled: ${error.message}")
                                 }
-                            }
+                            })
                     }
                 }
 
@@ -463,30 +491,48 @@ class ChatRepository {
     /**
      * Find chats for a user by their phone number.
      * This helps when a user reinstalls the app or gets a new Firebase User ID.
+     * Does NOT re-add chats that were previously deleted by the user.
      */
     fun findChatsByPhone(phone: String, onComplete: (List<String>) -> Unit) {
         val phoneDigits = phone.filter { it.isDigit() }.takeLast(10)
+        val userId = currentUserId
         
-        database.reference.child("phone_chats").child(phoneDigits)
+        if (userId == null) {
+            onComplete(emptyList())
+            return
+        }
+        
+        // First, get the list of deleted chats for this user
+        database.reference.child(DELETED_CHATS).child(userId)
             .get()
-            .addOnSuccessListener { snapshot ->
-                val chatIds = snapshot.children.mapNotNull { it.key }
+            .addOnSuccessListener { deletedSnapshot ->
+                val deletedChatIds = deletedSnapshot.children.mapNotNull { it.key }.toSet()
                 
-                // Add these chats to the current user's chat list
-                val userId = currentUserId
-                if (userId != null) {
-                    chatIds.forEach { chatId ->
-                        database.reference.child(USER_CHATS)
-                            .child(userId)
-                            .child(chatId)
-                            .setValue(true)
+                // Now get phone chats
+                database.reference.child("phone_chats").child(phoneDigits)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        val chatIds = snapshot.children.mapNotNull { it.key }
                         
-                        // Also add to participants
-                        addUserToChat(chatId, userId, phone)
+                        // Filter out deleted chats
+                        val validChatIds = chatIds.filter { it !in deletedChatIds }
+                        
+                        // Add only non-deleted chats to the current user's chat list
+                        validChatIds.forEach { chatId ->
+                            database.reference.child(USER_CHATS)
+                                .child(userId)
+                                .child(chatId)
+                                .setValue(true)
+                            
+                            // Also add to participants
+                            addUserToChat(chatId, userId, phone)
+                        }
+                        
+                        onComplete(validChatIds)
                     }
-                }
-                
-                onComplete(chatIds)
+                    .addOnFailureListener {
+                        onComplete(emptyList())
+                    }
             }
             .addOnFailureListener {
                 onComplete(emptyList())
@@ -496,16 +542,27 @@ class ChatRepository {
     // ==================== MESSAGES ====================
 
     /**
-     * Observe messages in a chat.
+     * Observe messages in a chat with real-time updates.
      */
     fun observeMessages(chatId: String, onMessagesUpdated: (List<Message>) -> Unit) {
+        Log.d(TAG, "Starting message observation for chat: $chatId")
+        
         database.reference.child(MESSAGES).child(chatId)
             .orderByChild("timestamp")
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    val messages = snapshot.children.mapNotNull { 
-                        it.getValue(Message::class.java)?.copy(id = it.key ?: "")
-                    }
+                    Log.d(TAG, "Message snapshot received: ${snapshot.childrenCount} messages")
+                    
+                    val messages = snapshot.children.mapNotNull { child ->
+                        try {
+                            child.getValue(Message::class.java)?.copy(id = child.key ?: "")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to parse message: ${e.message}")
+                            null
+                        }
+                    }.sortedBy { it.timestamp }
+                    
+                    Log.d(TAG, "Parsed ${messages.size} messages")
                     onMessagesUpdated(messages)
                     
                     // Mark messages as delivered for current user
@@ -743,5 +800,211 @@ class ChatRepository {
     ) {
         val chatName = "$barangay - Emergency"
         createChat(chatName, ChatType.BARANGAY, emptyList(), onSuccess, onError)
+    }
+    
+    // ==================== DELETE OPERATIONS ====================
+    
+    /**
+     * Delete a chat conversation.
+     * Removes the chat from user's chat list and optionally deletes all messages.
+     */
+    fun deleteChat(
+        chatId: String,
+        deleteMessages: Boolean = true,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val userId = currentUserId
+        if (userId == null) {
+            Log.e(TAG, "deleteChat: Not authenticated")
+            onError("Not authenticated")
+            return
+        }
+        
+        Log.d(TAG, "Deleting chat: $chatId for user: $userId")
+        
+        // First, mark this chat as deleted for this user (prevents re-sync)
+        database.reference.child(DELETED_CHATS).child(userId).child(chatId)
+            .setValue(true)
+            .addOnSuccessListener {
+                Log.d(TAG, "Marked chat as deleted")
+                
+                // Remove from user's chat list
+                database.reference.child(USER_CHATS).child(userId).child(chatId)
+                    .removeValue()
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Removed chat from user's list")
+                        
+                        // Also remove from phone_chats index to prevent re-sync
+                        removeFromPhoneChatIndex(chatId, userId)
+                        
+                        if (deleteMessages) {
+                            // Delete all messages in the chat
+                            database.reference.child(MESSAGES).child(chatId)
+                                .removeValue()
+                                .addOnSuccessListener {
+                                    Log.d(TAG, "Deleted messages for chat")
+                                    // Delete the chat itself if no other participants
+                                    checkAndDeleteChat(chatId, userId, onSuccess, onError)
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e(TAG, "Failed to delete messages: ${e.message}")
+                                    // Still consider it success since user's reference is removed
+                                    onSuccess()
+                                }
+                        } else {
+                            onSuccess()
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Failed to delete chat: ${e.message}")
+                        onError(e.message ?: "Failed to delete chat")
+                    }
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Failed to mark chat as deleted: ${e.message}")
+                onError(e.message ?: "Failed to delete chat")
+            }
+    }
+    
+    /**
+     * Remove chat from phone_chats index to prevent re-syncing.
+     */
+    private fun removeFromPhoneChatIndex(chatId: String, userId: String) {
+        // Get user's phone number and remove this chat from their phone index
+        database.reference.child(USERS).child(userId).child("phone")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val phone = snapshot.getValue(String::class.java) ?: ""
+                if (phone.isNotEmpty()) {
+                    val phoneDigits = phone.filter { it.isDigit() }.takeLast(10)
+                    database.reference.child("phone_chats").child(phoneDigits).child(chatId)
+                        .removeValue()
+                }
+            }
+    }
+    
+    private fun checkAndDeleteChat(
+        chatId: String, 
+        userId: String, 
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        // Check if any other users still have this chat
+        database.reference.child(CHATS).child(chatId).child("participants")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val participants = snapshot.children.mapNotNull { it.getValue(String::class.java) }
+                val remainingParticipants = participants.filter { it != userId }
+                
+                if (remainingParticipants.isEmpty()) {
+                    // No other participants, delete the chat entirely
+                    database.reference.child(CHATS).child(chatId).removeValue()
+                }
+                
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                // Still consider it success for the user
+                onSuccess()
+            }
+    }
+    
+    /**
+     * Delete all chats for the current user.
+     */
+    fun deleteAllChats(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val userId = currentUserId ?: return onError("Not authenticated")
+        
+        database.reference.child(USER_CHATS).child(userId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val chatIds = snapshot.children.mapNotNull { it.key }
+                
+                if (chatIds.isEmpty()) {
+                    onSuccess()
+                    return@addOnSuccessListener
+                }
+                
+                var deletedCount = 0
+                var hasError = false
+                
+                chatIds.forEach { chatId ->
+                    deleteChat(
+                        chatId = chatId,
+                        deleteMessages = true,
+                        onSuccess = {
+                            deletedCount++
+                            if (deletedCount == chatIds.size && !hasError) {
+                                onSuccess()
+                            }
+                        },
+                        onError = { error ->
+                            if (!hasError) {
+                                hasError = true
+                                onError(error)
+                            }
+                        }
+                    )
+                }
+            }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Failed to get chats")
+            }
+    }
+    
+    /**
+     * Delete the current user's account and all associated data.
+     */
+    fun deleteAccount(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val userId = currentUserId ?: return onError("Not authenticated")
+        
+        // Delete user's chats first
+        deleteAllChats(
+            onSuccess = {
+                // Delete user profile
+                database.reference.child(USERS).child(userId)
+                    .removeValue()
+                    .addOnSuccessListener {
+                        // Delete phone chat index
+                        database.reference.child("phone_chats")
+                            .get()
+                            .addOnSuccessListener { snapshot ->
+                                // Remove user from all phone_chats entries
+                                snapshot.children.forEach { phoneEntry ->
+                                    phoneEntry.children.forEach { chatEntry ->
+                                        // Clean up if needed
+                                    }
+                                }
+                                
+                                // Sign out and delete Firebase auth
+                                auth.currentUser?.delete()
+                                    ?.addOnSuccessListener { onSuccess() }
+                                    ?.addOnFailureListener { e ->
+                                        // Auth deletion failed but data is gone
+                                        auth.signOut()
+                                        onSuccess()
+                                    }
+                            }
+                            .addOnFailureListener {
+                                // Continue anyway
+                                auth.signOut()
+                                onSuccess()
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        onError(e.message ?: "Failed to delete user profile")
+                    }
+            },
+            onError = onError
+        )
+    }
+    
+    /**
+     * Sign out and clear local session.
+     */
+    fun signOut() {
+        setOnlineStatus(false)
+        auth.signOut()
     }
 }

@@ -84,12 +84,12 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         
-        <!-- Onboarding (Launcher for first-time users) -->
+        <!-- Onboarding (Launcher with Splash Screen for first-time users) -->
         <activity
             android:name=".ui.OnboardingActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.SafePasigAI">
+            android:theme="@style/Theme.SafePasigAI.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

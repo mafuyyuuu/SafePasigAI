@@ -77,6 +77,9 @@ dependencies {
     // Glide for image loading
     implementation("com.github.bumptech.glide:glide:4.16.0")
     
+    // Splash Screen API (for Android 12+ compatibility)
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    
     // UCrop for image cropping (1:1 ratio for avatars)
     implementation("com.github.yalantis:ucrop:2.2.8")
 

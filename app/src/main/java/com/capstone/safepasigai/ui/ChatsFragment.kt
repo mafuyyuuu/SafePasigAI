@@ -61,14 +61,82 @@ class ChatsFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        chatAdapter = ChatListAdapter { chat ->
-            openChat(chat)
-        }
+        chatAdapter = ChatListAdapter(
+            onChatClick = { chat -> openChat(chat) },
+            onChatLongClick = { chat -> showDeleteChatDialog(chat) },
+            resolveContactName = { chat -> resolveContactName(chat) }
+        )
         
         binding.rvChats.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = chatAdapter
         }
+    }
+    
+    /**
+     * Resolve the display name for a chat by matching with local contacts.
+     * This ensures we show our local contact name, not the name the other person saved us as.
+     */
+    private fun resolveContactName(chat: Chat): String {
+        val contacts = contactsRepository.getContacts()
+        
+        // Try to find a matching contact
+        for (contact in contacts) {
+            // Match by name similarity
+            if (chat.name.contains(contact.name, ignoreCase = true) || 
+                contact.name.contains(chat.name, ignoreCase = true)) {
+                return contact.name
+            }
+            
+            // Match by phone number in chat ID
+            val phoneDigits = contact.phone.filter { it.isDigit() }.takeLast(10)
+            if (phoneDigits.isNotEmpty() && chat.id.contains(phoneDigits)) {
+                return contact.name
+            }
+        }
+        
+        // Fallback to original chat name
+        return chat.name
+    }
+    
+    private fun showDeleteChatDialog(chat: Chat) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Delete Conversation")
+            .setMessage("Delete your conversation with ${chat.name}?\n\nThis will remove all messages in this chat.")
+            .setPositiveButton("Delete") { _, _ ->
+                deleteChat(chat)
+            }
+            .setNegativeButton("Cancel", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+    }
+    
+    private fun deleteChat(chat: Chat) {
+        // Check if authenticated first
+        if (!isAuthenticated) {
+            Toast.makeText(context, "Not connected. Please try again.", Toast.LENGTH_SHORT).show()
+            authenticateAndLoadChats()
+            return
+        }
+        
+        Toast.makeText(context, "Deleting conversation...", Toast.LENGTH_SHORT).show()
+        
+        chatRepository.deleteChat(
+            chatId = chat.id,
+            deleteMessages = true,
+            onSuccess = {
+                activity?.runOnUiThread {
+                    Toast.makeText(context, "Conversation deleted", Toast.LENGTH_SHORT).show()
+                    // Force refresh the chat list
+                    observeChats()
+                }
+            },
+            onError = { error ->
+                activity?.runOnUiThread {
+                    Toast.makeText(context, "Failed to delete: $error", Toast.LENGTH_LONG).show()
+                }
+            }
+        )
     }
     
     private fun setupFAB() {
@@ -269,10 +337,44 @@ class ChatsFragment : Fragment() {
     }
 
     private fun openChat(chat: Chat) {
+        // Find the correct name from local contacts
+        // The chat.name might be what the OTHER person named US
+        // We need to show our local contact name for them
+        val contacts = contactsRepository.getContacts()
+        
+        // Try to find a matching contact by phone number from the chat
+        // First, check if the chat has participants info
+        var displayName = chat.name
+        var contactPhone = ""
+        var contactId = ""
+        
+        // Check each contact to find a match
+        for (contact in contacts) {
+            // If the contact name appears in the chat name or vice versa
+            if (chat.name.contains(contact.name, ignoreCase = true) || 
+                contact.name.contains(chat.name, ignoreCase = true)) {
+                displayName = contact.name
+                contactPhone = contact.phone
+                contactId = contact.id
+                break
+            }
+            
+            // Also check if the phone number matches (chat IDs often contain phone numbers)
+            val phoneDigits = contact.phone.filter { it.isDigit() }.takeLast(10)
+            if (phoneDigits.isNotEmpty() && chat.id.contains(phoneDigits)) {
+                displayName = contact.name
+                contactPhone = contact.phone
+                contactId = contact.id
+                break
+            }
+        }
+        
         val intent = Intent(requireContext(), ChatActivity::class.java).apply {
             putExtra(ChatActivity.EXTRA_CHAT_ID, chat.id)
-            putExtra(ChatActivity.EXTRA_CHAT_NAME, chat.name)
+            putExtra(ChatActivity.EXTRA_CHAT_NAME, displayName)
             putExtra(ChatActivity.EXTRA_IS_ONLINE, chat.isOnline)
+            putExtra(ChatActivity.EXTRA_CONTACT_PHONE, contactPhone)
+            putExtra(ChatActivity.EXTRA_CONTACT_ID, contactId)
         }
         startActivity(intent)
     }

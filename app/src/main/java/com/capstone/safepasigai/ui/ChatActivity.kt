@@ -395,18 +395,27 @@ class ChatActivity : AppCompatActivity() {
         chatRepository.observeMessages(chatId) { messages ->
             Log.d(TAG, "Received ${messages.size} messages")
             
-            if (messages.isEmpty()) {
-                binding.emptyState.visibility = View.VISIBLE
-                binding.rvMessages.visibility = View.GONE
-            } else {
-                binding.emptyState.visibility = View.GONE
-                binding.rvMessages.visibility = View.VISIBLE
-                messageAdapter.submitList(messages)
-                binding.rvMessages.scrollToPosition(messages.size - 1)
+            runOnUiThread {
+                if (messages.isEmpty()) {
+                    binding.emptyState.visibility = View.VISIBLE
+                    binding.rvMessages.visibility = View.GONE
+                } else {
+                    binding.emptyState.visibility = View.GONE
+                    binding.rvMessages.visibility = View.VISIBLE
+                    
+                    // Create a new list to ensure DiffUtil detects changes
+                    val newList = messages.toMutableList()
+                    messageAdapter.submitList(newList) {
+                        // Scroll to bottom after list is updated
+                        if (newList.isNotEmpty()) {
+                            binding.rvMessages.scrollToPosition(newList.size - 1)
+                        }
+                    }
+                }
+                
+                // Mark new messages as seen
+                chatRepository.markMessagesAsSeen(chatId)
             }
-            
-            // Mark new messages as seen
-            chatRepository.markMessagesAsSeen(chatId)
         }
     }
 

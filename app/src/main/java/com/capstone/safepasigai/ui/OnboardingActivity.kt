@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.capstone.safepasigai.R
@@ -18,6 +19,7 @@ import com.capstone.safepasigai.databinding.ItemOnboardingPageBinding
 
 /**
  * OnboardingActivity - Welcome flow for first-time users.
+ * Shows a splash screen with the app logo when launched.
  */
 class OnboardingActivity : AppCompatActivity() {
 
@@ -52,17 +54,28 @@ class OnboardingActivity : AppCompatActivity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install the splash screen BEFORE calling super.onCreate()
+        val splashScreen = installSplashScreen()
+        
         super.onCreate(savedInstanceState)
-        binding = ActivityOnboardingBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
+        
         userRepository = UserRepository(this)
 
-        // Check if already completed
+        // Keep the splash screen visible while checking onboarding status
+        var isReady = false
+        splashScreen.setKeepOnScreenCondition { !isReady }
+        
+        // Check if already completed onboarding
         if (userRepository.isOnboardingComplete()) {
+            isReady = true
             navigateToMain()
             return
         }
+        
+        isReady = true
+        
+        binding = ActivityOnboardingBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         setupViewPager()
         setupIndicators()

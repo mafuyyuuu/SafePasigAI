@@ -16,7 +16,9 @@ import java.util.Date
 import java.util.Locale
 
 class ChatListAdapter(
-    private val onChatClick: (Chat) -> Unit
+    private val onChatClick: (Chat) -> Unit,
+    private val onChatLongClick: ((Chat) -> Unit)? = null,
+    private val resolveContactName: ((Chat) -> String)? = null
 ) : ListAdapter<Chat, ChatListAdapter.ChatViewHolder>(ChatDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
@@ -37,9 +39,12 @@ class ChatListAdapter(
         fun bind(chat: Chat) {
             val context = itemView.context
             
-            binding.tvName.text = chat.name
+            // Resolve the display name using local contacts if resolver is provided
+            val displayName = resolveContactName?.invoke(chat) ?: chat.name
+            
+            binding.tvName.text = displayName
             binding.tvLastMessage.text = chat.lastMessage.ifEmpty { "Start a conversation" }
-            binding.tvInitial.text = chat.name.firstOrNull()?.uppercase() ?: "?"
+            binding.tvInitial.text = displayName.firstOrNull()?.uppercase() ?: "?"
             
             // Format time using the Chat's helper method or manual format
             if (chat.lastMessageTime > 0) {
@@ -78,6 +83,12 @@ class ChatListAdapter(
             binding.tvInitial.setBackgroundColor(context.getColor(bgColor))
             
             itemView.setOnClickListener { onChatClick(chat) }
+            
+            // Long press for delete
+            itemView.setOnLongClickListener {
+                onChatLongClick?.invoke(chat)
+                true
+            }
         }
     }
 

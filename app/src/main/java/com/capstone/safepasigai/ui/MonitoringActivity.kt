@@ -7,23 +7,29 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Paint
 import android.location.Location
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.capstone.safepasigai.R
+import com.capstone.safepasigai.data.repository.DangerZoneRepository
 import com.capstone.safepasigai.data.repository.SafetyHistoryRepository
 import com.capstone.safepasigai.data.repository.SettingsRepository
 import com.capstone.safepasigai.databinding.ActivityMonitoringBinding
 import com.capstone.safepasigai.service.SmartEscortService
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,18 +38,23 @@ import java.util.Locale
 /**
  * MonitoringActivity - Smart Escort monitoring screen with FREE OpenStreetMap.
  * 
- * Uses OSMDroid (OpenStreetMap) - completely free, no API key required!
+ * Features:
+ * - Real-time location tracking
+ * - Danger zone heatmap visualization
+ * - Danger zone warnings when entering high-risk areas
  */
 class MonitoringActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMonitoringBinding
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var safetyHistoryRepository: SafetyHistoryRepository
+    private lateinit var dangerZoneRepository: DangerZoneRepository
     
     // Map
     private var currentMarker: Marker? = null
     private val pathPoints = mutableListOf<GeoPoint>()
     private var pathOverlay: Polyline? = null
+    private val dangerZoneOverlays = mutableListOf<Polygon>()
     
     // Service binding
     private var escortService: SmartEscortService? = null
@@ -51,6 +62,18 @@ class MonitoringActivity : AppCompatActivity() {
     
     // State
     private var isVoiceEnabled = true
+    private var isHeatmapVisible = true
+    private var lastDangerWarningTime = 0L
+    private val dangerWarningCooldown = 60000L  // 1 minute between warnings
+    
+    // Handler for periodic danger zone checks
+    private val handler = Handler(Looper.getMainLooper())
+    private val dangerZoneCheckRunnable = object : Runnable {
+        override fun run() {
+            checkDangerZone()
+            handler.postDelayed(this, 10000)  // Check every 10 seconds
+        }
+    }
     
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -104,6 +127,7 @@ class MonitoringActivity : AppCompatActivity() {
         
         settingsRepository = SettingsRepository(this)
         safetyHistoryRepository = SafetyHistoryRepository(this)
+        dangerZoneRepository = DangerZoneRepository(this)
         
         // Load settings
         isVoiceEnabled = settingsRepository.isVoiceDetectionEnabled()
@@ -111,7 +135,37 @@ class MonitoringActivity : AppCompatActivity() {
         setupMap()
         setupButtons()
         updateInitialStatus()
+        
+        // Add sample danger zones for testing (remove in production)
+        addSampleDangerZonesIfEmpty()
+        
+        loadDangerZones()
         checkPermissionsAndStart()
+    }
+    
+    /**
+     * Add sample danger zones for testing/demo purposes.
+     * Remove this in production.
+     */
+    private fun addSampleDangerZonesIfEmpty() {
+        val clusters = dangerZoneRepository.getDangerClusters()
+        if (clusters.isEmpty()) {
+            // Add sample danger events in Pasig City for demo
+            // These are sample locations - not real danger zones
+            
+            // Sample 1: Near Pasig City Hall area (cluster of 4 events)
+            dangerZoneRepository.reportDangerEvent(14.5764, 121.0851, "DEMO", 3)
+            dangerZoneRepository.reportDangerEvent(14.5766, 121.0853, "DEMO", 4)
+            dangerZoneRepository.reportDangerEvent(14.5762, 121.0849, "DEMO", 3)
+            dangerZoneRepository.reportDangerEvent(14.5765, 121.0850, "DEMO", 5)
+            
+            // Sample 2: Near Ortigas area (cluster of 3 events)
+            dangerZoneRepository.reportDangerEvent(14.5873, 121.0615, "DEMO", 4)
+            dangerZoneRepository.reportDangerEvent(14.5875, 121.0617, "DEMO", 3)
+            dangerZoneRepository.reportDangerEvent(14.5871, 121.0613, "DEMO", 4)
+            
+            android.util.Log.d("MonitoringActivity", "Added sample danger zones for demo")
+        }
     }
     
     private fun updateInitialStatus() {
@@ -167,6 +221,11 @@ class MonitoringActivity : AppCompatActivity() {
                 val geoPoint = GeoPoint(location.latitude, location.longitude)
                 binding.mapView.controller.animateTo(geoPoint)
             }
+        }
+        
+        // Heatmap toggle button
+        binding.btnHeatmap.setOnClickListener {
+            toggleHeatmapVisibility()
         }
         
         // Mic button - toggle voice detection
@@ -336,18 +395,144 @@ class MonitoringActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
+        handler.post(dangerZoneCheckRunnable)
     }
     
     override fun onPause() {
         super.onPause()
         binding.mapView.onPause()
+        handler.removeCallbacks(dangerZoneCheckRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(dangerZoneCheckRunnable)
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false
+        }
+    }
+    
+    // ==================== DANGER ZONE VISUALIZATION ====================
+    
+    /**
+     * Load and display danger zones as heatmap circles on the map.
+     */
+    private fun loadDangerZones() {
+        // Clear existing overlays
+        dangerZoneOverlays.forEach { binding.mapView.overlays.remove(it) }
+        dangerZoneOverlays.clear()
+        
+        // Get danger clusters from DBSCAN
+        val clusters = dangerZoneRepository.getDangerClusters()
+        
+        for (cluster in clusters) {
+            // Create a circle polygon for each danger zone
+            val center = GeoPoint(cluster.centroid.first, cluster.centroid.second)
+            val radiusInDegrees = cluster.radius / 111000.0  // Convert meters to degrees
+            
+            // Generate circle points
+            val circlePoints = mutableListOf<GeoPoint>()
+            for (i in 0..36) {
+                val angle = Math.toRadians(i * 10.0)
+                val lat = center.latitude + radiusInDegrees * kotlin.math.cos(angle)
+                val lng = center.longitude + radiusInDegrees * kotlin.math.sin(angle) / 
+                          kotlin.math.cos(Math.toRadians(center.latitude))
+                circlePoints.add(GeoPoint(lat, lng))
+            }
+            
+            // Create polygon with color based on risk score
+            val polygon = Polygon().apply {
+                points = circlePoints
+                
+                // Color intensity based on risk score (0.0 - 1.0)
+                val alpha = (cluster.riskScore * 150).toInt().coerceIn(50, 180)
+                fillPaint.color = Color.argb(alpha, 255, 0, 0)  // Red with varying opacity
+                
+                outlinePaint.color = Color.argb(200, 200, 0, 0)
+                outlinePaint.strokeWidth = 2f
+                outlinePaint.style = Paint.Style.STROKE
+                
+                title = "⚠️ Danger Zone"
+                snippet = "Risk: ${(cluster.riskScore * 100).toInt()}% • ${cluster.pointCount} incidents"
+            }
+            
+            dangerZoneOverlays.add(polygon)
+            binding.mapView.overlays.add(0, polygon)  // Add behind other overlays
+        }
+        
+        binding.mapView.invalidate()
+    }
+    
+    /**
+     * Check if user is in a danger zone and show warning.
+     */
+    private fun checkDangerZone() {
+        val location = escortService?.getCurrentLocation() ?: return
+        
+        val (isInDanger, nearestCluster) = dangerZoneRepository.checkDangerZone(
+            location.latitude, 
+            location.longitude,
+            threshold = 0.3
+        )
+        
+        if (isInDanger && nearestCluster != null) {
+            val currentTime = System.currentTimeMillis()
+            
+            // Only show warning if cooldown has passed
+            if (currentTime - lastDangerWarningTime >= dangerWarningCooldown) {
+                lastDangerWarningTime = currentTime
+                showDangerZoneWarning(nearestCluster.riskScore, nearestCluster.pointCount)
+            }
+        }
+    }
+    
+    /**
+     * Show danger zone warning dialog.
+     */
+    private fun showDangerZoneWarning(riskScore: Double, incidentCount: Int) {
+        val riskPercent = (riskScore * 100).toInt()
+        
+        MaterialAlertDialogBuilder(this)
+            .setTitle("⚠️ Danger Zone Alert")
+            .setMessage(
+                "You are entering an area with elevated risk!\n\n" +
+                "• Risk Level: $riskPercent%\n" +
+                "• Past Incidents: $incidentCount\n\n" +
+                "Stay alert and consider an alternative route."
+            )
+            .setPositiveButton("I Understand") { _, _ -> }
+            .setNegativeButton("View on Map") { _, _ ->
+                // Zoom to show danger zones
+                binding.mapView.controller.setZoom(16.0)
+            }
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+        
+        // Update status UI
+        binding.statusDot.backgroundTintList = 
+            ContextCompat.getColorStateList(this, R.color.orange)
+        binding.tvMonitoringStatus.text = "⚠️ In danger zone ($riskPercent% risk)"
+    }
+    
+    /**
+     * Toggle visibility of danger zone heatmap overlays.
+     */
+    private fun toggleHeatmapVisibility() {
+        isHeatmapVisible = !isHeatmapVisible
+        
+        if (isHeatmapVisible) {
+            // Show danger zones
+            loadDangerZones()
+            binding.btnHeatmap.backgroundTintList = ContextCompat.getColorStateList(this, R.color.alert_red)
+            Toast.makeText(this, "Danger zones visible", Toast.LENGTH_SHORT).show()
+        } else {
+            // Hide danger zones
+            dangerZoneOverlays.forEach { binding.mapView.overlays.remove(it) }
+            dangerZoneOverlays.clear()
+            binding.mapView.invalidate()
+            binding.btnHeatmap.backgroundTintList = ContextCompat.getColorStateList(this, R.color.gray_400)
+            Toast.makeText(this, "Danger zones hidden", Toast.LENGTH_SHORT).show()
         }
     }
 }

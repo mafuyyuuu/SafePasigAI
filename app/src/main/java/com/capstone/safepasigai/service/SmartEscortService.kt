@@ -27,7 +27,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.capstone.safepasigai.R
+import com.capstone.safepasigai.data.repository.DangerZoneRepository
 import com.capstone.safepasigai.data.repository.SettingsRepository
+import com.capstone.safepasigai.ml.SignalVectorMagnitude
 import com.capstone.safepasigai.ui.MonitoringActivity
 import com.capstone.safepasigai.ui.SOSActivity
 import org.tensorflow.lite.support.audio.TensorAudio
@@ -42,9 +44,10 @@ import kotlin.math.sqrt
  * 
  * Features:
  * 1. PARTIAL_WAKE_LOCK to keep CPU running when screen is off
- * 2. Accelerometer-based fall detection
+ * 2. Signal Vector Magnitude (SVM) algorithm for accurate fall detection
  * 3. TensorFlow Lite audio classification for "Saklolo" detection
- * 4. Persistent notification with stop action
+ * 4. DBSCAN-based danger zone detection and heatmaps
+ * 5. Persistent notification with stop action
  * 
  * Architecture: Service owns all sensor logic. Activity binds for UI updates only.
  */
@@ -55,13 +58,24 @@ class SmartEscortService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "smart_escort_channel"
         
-        // Fall detection parameters
-        private const val FALL_THRESHOLD = 25.0f
-        private const val DEBOUNCE_MS = 5000L // 5 seconds debounce
+        // Fall detection parameters - Multi-stage detection
+        // Stage 1: Free-fall detection (acceleration drops below gravity)
+        private const val FREE_FALL_THRESHOLD = 3.0f  // Near weightlessness
+        private const val FREE_FALL_MIN_DURATION_MS = 100L  // At least 100ms of free-fall
+        
+        // Stage 2: Impact detection (sudden high acceleration after free-fall)
+        private const val IMPACT_THRESHOLD = 25.0f  // High G impact
+        private const val IMPACT_WINDOW_MS = 1000L  // Must happen within 1 second of free-fall
+        
+        // Stage 3: Stillness detection (lack of movement after impact)
+        private const val STILLNESS_THRESHOLD = 2.0f  // Near-stationary (gravity only ~9.8)
+        private const val STILLNESS_DURATION_MS = 1500L  // Must be still for 1.5 seconds
+        
+        private const val DEBOUNCE_MS = 10000L // 10 seconds debounce between alerts
         
         // Audio classification parameters
         private const val MODEL_FILE = "soundclassifier.tflite"
-        private const val SAKLOLO_THRESHOLD = 0.85f
+        private const val SAKLOLO_THRESHOLD = 0.70f  // Lowered for better detection
         private const val AUDIO_CLASSIFY_INTERVAL_MS = 500L
         
         // Actions
@@ -83,6 +97,12 @@ class SmartEscortService : Service(), SensorEventListener {
     // Settings Repository
     private lateinit var settingsRepository: SettingsRepository
     
+    // Danger Zone Repository (for DBSCAN clustering)
+    private lateinit var dangerZoneRepository: DangerZoneRepository
+    
+    // Signal Vector Magnitude for fall detection
+    private val svmDetector = SignalVectorMagnitude()
+    
     // Audio AI
     private var audioClassifier: AudioClassifier? = null
     private var tensorAudio: TensorAudio? = null
@@ -91,6 +111,13 @@ class SmartEscortService : Service(), SensorEventListener {
     @Volatile private var isAudioEnabled = false
     @Volatile private var isAudioInitialized = false
     @Volatile private var isFallDetectionEnabled = true
+    @Volatile private var useVolumeBasedDetection = false  // Fallback when no TFLite model
+    
+    // Volume-based detection parameters (fallback)
+    private var loudSoundStartTime: Long = 0
+    private var isLoudSound = false
+    private val LOUD_SOUND_THRESHOLD = 5000  // Amplitude threshold for loud sound
+    private val LOUD_SOUND_DURATION_MS = 1500L  // Must be loud for 1.5 seconds
     
     // Location Tracking
     private var locationTracker: LocationTracker? = null
@@ -117,6 +144,7 @@ class SmartEscortService : Service(), SensorEventListener {
         Log.d(TAG, "Service created")
         
         settingsRepository = SettingsRepository(this)
+        dangerZoneRepository = DangerZoneRepository(this)
         
         // Load settings
         isFallDetectionEnabled = settingsRepository.isFallDetectionEnabled()
@@ -151,15 +179,6 @@ class SmartEscortService : Service(), SensorEventListener {
 
     private fun initializeAudioClassifier() {
         try {
-            // Check if model exists
-            val modelExists = assets.list("")?.contains(MODEL_FILE) ?: false
-            if (!modelExists) {
-                Log.w(TAG, "Audio model '$MODEL_FILE' not found. Voice detection disabled.")
-                isAudioEnabled = false
-                isAudioInitialized = true
-                return
-            }
-            
             // Check microphone permission
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
                 != PackageManager.PERMISSION_GRANTED) {
@@ -169,11 +188,27 @@ class SmartEscortService : Service(), SensorEventListener {
                 return
             }
             
+            // Check if model exists
+            val modelExists = assets.list("")?.contains(MODEL_FILE) ?: false
+            if (!modelExists) {
+                Log.w(TAG, "Audio model '$MODEL_FILE' not found. Using volume-based detection as fallback.")
+                // Enable volume-based detection as fallback
+                useVolumeBasedDetection = true
+                isAudioEnabled = settingsRepository.isVoiceDetectionEnabled()
+                isAudioInitialized = true
+                
+                if (isMonitoring && isAudioEnabled) {
+                    startVolumeBasedDetection()
+                }
+                return
+            }
+            
             audioClassifier = AudioClassifier.createFromFile(this, MODEL_FILE)
             tensorAudio = audioClassifier?.createInputTensorAudio()
             
             isAudioEnabled = true
             isAudioInitialized = true
+            useVolumeBasedDetection = false
             Log.d(TAG, "Audio classifier initialized successfully")
             
             // If monitoring already started, start audio classification now
@@ -182,9 +217,14 @@ class SmartEscortService : Service(), SensorEventListener {
             }
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize audio classifier: ${e.message}")
-            isAudioEnabled = false
+            Log.e(TAG, "Failed to initialize audio classifier: ${e.message}. Using volume-based fallback.")
+            useVolumeBasedDetection = true
+            isAudioEnabled = settingsRepository.isVoiceDetectionEnabled()
             isAudioInitialized = true
+            
+            if (isMonitoring && isAudioEnabled) {
+                startVolumeBasedDetection()
+            }
         }
     }
 
@@ -313,7 +353,7 @@ class SmartEscortService : Service(), SensorEventListener {
         wakeLock = null
     }
 
-    // ==================== ACCELEROMETER ====================
+    // ==================== ACCELEROMETER - SVM FALL DETECTION ====================
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (!isMonitoring || !isFallDetectionEnabled) return
@@ -324,9 +364,22 @@ class SmartEscortService : Service(), SensorEventListener {
                 val y = it.values[1]
                 val z = it.values[2]
                 
-                val acceleration = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+                // Use Signal Vector Magnitude algorithm for accurate fall detection
+                val result = svmDetector.analyze(x, y, z)
                 
-                if (acceleration > FALL_THRESHOLD) {
+                // Log state transitions for debugging
+                if (result.debugInfo.isNotEmpty()) {
+                    Log.d(TAG, "SVM: ${result.debugInfo}")
+                }
+                
+                // Check if fall was detected
+                if (result.isFallDetected) {
+                    Log.w(TAG, "!!! FALL DETECTED via SVM (confidence: ${result.confidence}) !!!")
+                    
+                    // Reset the detector for next detection
+                    svmDetector.reset()
+                    
+                    // Trigger SOS
                     triggerSOS("FALL DETECTED")
                 }
             }
@@ -338,6 +391,12 @@ class SmartEscortService : Service(), SensorEventListener {
     // ==================== AUDIO CLASSIFICATION ====================
 
     private fun startAudioClassification() {
+        // Use volume-based detection if no TFLite model
+        if (useVolumeBasedDetection) {
+            startVolumeBasedDetection()
+            return
+        }
+        
         // Wait for async initialization to complete
         if (!isAudioInitialized || !isAudioEnabled || audioClassifier == null) return
         
@@ -372,6 +431,96 @@ class SmartEscortService : Service(), SensorEventListener {
         audioRecord = null
         
         Log.d(TAG, "Audio classification stopped")
+    }
+    
+    // ==================== VOLUME-BASED DETECTION (FALLBACK) ====================
+    
+    /**
+     * Fallback voice detection using volume/amplitude analysis.
+     * This is used when no TFLite model is available.
+     * Detects sustained loud sounds (like shouting) as potential distress.
+     */
+    private fun startVolumeBasedDetection() {
+        if (!isAudioEnabled || audioExecutor != null) return
+        
+        try {
+            val sampleRate = 16000
+            val channelConfig = AudioFormat.CHANNEL_IN_MONO
+            val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+            val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+            
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
+                != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "RECORD_AUDIO permission not granted for volume detection")
+                return
+            }
+            
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                channelConfig,
+                audioFormat,
+                bufferSize
+            )
+            
+            audioRecord?.startRecording()
+            
+            audioExecutor = Executors.newSingleThreadScheduledExecutor()
+            audioExecutor?.scheduleAtFixedRate(
+                { analyzeVolume() },
+                0,
+                200L,  // Check every 200ms
+                TimeUnit.MILLISECONDS
+            )
+            
+            Log.d(TAG, "Volume-based detection started (fallback mode)")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start volume detection: ${e.message}")
+        }
+    }
+    
+    private fun analyzeVolume() {
+        if (!isMonitoring || !isAudioEnabled) return
+        
+        try {
+            val buffer = ShortArray(1024)
+            val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+            
+            if (read > 0) {
+                // Calculate RMS amplitude
+                var sum = 0L
+                for (i in 0 until read) {
+                    sum += buffer[i] * buffer[i]
+                }
+                val rms = kotlin.math.sqrt(sum.toDouble() / read).toInt()
+                
+                val currentTime = System.currentTimeMillis()
+                
+                if (rms > LOUD_SOUND_THRESHOLD) {
+                    if (!isLoudSound) {
+                        isLoudSound = true
+                        loudSoundStartTime = currentTime
+                        Log.d(TAG, "Loud sound detected (RMS: $rms)")
+                    } else {
+                        // Check if loud sound has been sustained
+                        val duration = currentTime - loudSoundStartTime
+                        if (duration >= LOUD_SOUND_DURATION_MS) {
+                            Log.w(TAG, "Sustained loud sound detected! Duration: ${duration}ms, RMS: $rms")
+                            isLoudSound = false
+                            triggerSOS("LOUD DISTRESS SOUND")
+                        }
+                    }
+                } else {
+                    // Reset if sound drops
+                    if (isLoudSound && (currentTime - loudSoundStartTime > 500)) {
+                        isLoudSound = false
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Volume analysis error: ${e.message}")
+        }
     }
 
     private fun classifyAudio() {
@@ -427,10 +576,30 @@ class SmartEscortService : Service(), SensorEventListener {
             it.vibrate(VibrationEffect.createWaveform(pattern, -1))
         }
         
-        // 2. Notify bound Activity
+        // 2. Report to danger zone repository for DBSCAN clustering
+        currentLocation?.let { location ->
+            val eventType = when {
+                reason.contains("FALL") -> "FALL"
+                reason.contains("VOICE") -> "VOICE"
+                reason.contains("LOUD") -> "LOUD"
+                reason.contains("MANUAL") -> "MANUAL"
+                else -> "SOS"
+            }
+            val severity = if (reason.contains("FALL") || reason.contains("VOICE")) 4 else 3
+            
+            dangerZoneRepository.reportDangerEvent(
+                lat = location.latitude,
+                lng = location.longitude,
+                eventType = eventType,
+                severity = severity
+            )
+            Log.d(TAG, "Danger event reported to DBSCAN: $eventType at ${location.latitude}, ${location.longitude}")
+        }
+        
+        // 3. Notify bound Activity
         dangerCallback?.invoke(reason)
         
-        // 3. Launch SOS Activity
+        // 4. Launch SOS Activity
         val sosIntent = Intent(this, SOSActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("REASON", reason)
@@ -468,10 +637,10 @@ class SmartEscortService : Service(), SensorEventListener {
             this, 1, stopIntent, PendingIntent.FLAG_IMMUTABLE
         )
         
-        val statusText = if (isAudioEnabled) {
-            "Motion + Voice Detection Active"
-        } else {
-            "Motion Detection Active"
+        val statusText = when {
+            isAudioEnabled && useVolumeBasedDetection -> "Motion + Volume Detection Active"
+            isAudioEnabled -> "Motion + Voice AI Detection Active"
+            else -> "Motion Detection Active"
         }
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -503,6 +672,8 @@ class SmartEscortService : Service(), SensorEventListener {
     fun isCurrentlyMonitoring(): Boolean = isMonitoring
     
     fun isAudioDetectionEnabled(): Boolean = isAudioEnabled
+    
+    fun isUsingVolumeBasedDetection(): Boolean = useVolumeBasedDetection
     
     fun isLocationTrackingEnabled(): Boolean = locationTracker?.isCurrentlyTracking() ?: false
     
@@ -536,6 +707,30 @@ class SmartEscortService : Service(), SensorEventListener {
     }
     
     fun isFallDetectionCurrentlyEnabled(): Boolean = isFallDetectionEnabled
+    
+    /**
+     * Get danger zone clusters for heatmap display.
+     */
+    fun getDangerZoneClusters() = dangerZoneRepository.getDangerClusters()
+    
+    /**
+     * Get risk level at a specific location.
+     * @return Risk level 0.0 (safe) to 1.0 (high danger)
+     */
+    fun getRiskLevelAt(lat: Double, lng: Double) = dangerZoneRepository.getRiskLevel(lat, lng)
+    
+    /**
+     * Check if current location is in a danger zone.
+     */
+    fun isInDangerZone(): Boolean {
+        val location = currentLocation ?: return false
+        return dangerZoneRepository.checkDangerZone(location.latitude, location.longitude).first
+    }
+    
+    /**
+     * Get heatmap points for visualization.
+     */
+    fun getHeatmapPoints() = dangerZoneRepository.getHeatmapPoints()
 
     override fun onDestroy() {
         super.onDestroy()
@@ -543,6 +738,7 @@ class SmartEscortService : Service(), SensorEventListener {
         stopAudioClassification()
         sensorManager.unregisterListener(this)
         releaseWakeLock()
+        svmDetector.reset()
         Log.d(TAG, "Service destroyed")
     }
 }

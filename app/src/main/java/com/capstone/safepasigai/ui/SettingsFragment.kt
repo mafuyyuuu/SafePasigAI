@@ -6,9 +6,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.NumberPicker
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.capstone.safepasigai.R
+import com.capstone.safepasigai.data.repository.ChatRepository
 import com.capstone.safepasigai.data.repository.SettingsRepository
 import com.capstone.safepasigai.data.repository.UserRepository
 import com.capstone.safepasigai.databinding.FragmentSettingsBinding
@@ -21,6 +23,7 @@ class SettingsFragment : Fragment() {
     
     private lateinit var userRepository: UserRepository
     private lateinit var settingsRepository: SettingsRepository
+    private lateinit var chatRepository: ChatRepository
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,6 +39,7 @@ class SettingsFragment : Fragment() {
         
         userRepository = UserRepository(requireContext())
         settingsRepository = SettingsRepository(requireContext())
+        chatRepository = ChatRepository()
         
         loadSettings()
         setupListeners()
@@ -84,6 +88,16 @@ class SettingsFragment : Fragment() {
         binding.btnPrivacy.setOnClickListener {
             showPrivacyPolicy()
         }
+        
+        // Delete All Chats
+        binding.btnDeleteChats.setOnClickListener {
+            showDeleteChatsConfirmation()
+        }
+        
+        // Delete Account
+        binding.btnDeleteAccount.setOnClickListener {
+            showDeleteAccountConfirmation()
+        }
     }
     
     private fun showCountdownPicker() {
@@ -129,6 +143,90 @@ class SettingsFragment : Fragment() {
             .setView(dialogView)
             .setPositiveButton("I Understand", null)
             .show()
+    }
+    
+    private fun showDeleteChatsConfirmation() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Delete All Chats?")
+            .setMessage("This will permanently delete all your conversations. This action cannot be undone.")
+            .setPositiveButton("Delete") { _, _ ->
+                deleteAllChats()
+            }
+            .setNegativeButton("Cancel", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+    }
+    
+    private fun deleteAllChats() {
+        chatRepository.deleteAllChats(
+            onSuccess = {
+                activity?.runOnUiThread {
+                    Toast.makeText(requireContext(), "All chats deleted", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onError = { error ->
+                activity?.runOnUiThread {
+                    Toast.makeText(requireContext(), "Error: $error", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+    
+    private fun showDeleteAccountConfirmation() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Delete Account?")
+            .setMessage(
+                "This will permanently delete:\n\n" +
+                "• Your profile\n" +
+                "• All conversations\n" +
+                "• All emergency contacts\n" +
+                "• All safety history\n\n" +
+                "This action cannot be undone!"
+            )
+            .setPositiveButton("Delete Account") { _, _ ->
+                // Second confirmation for safety
+                showFinalDeleteConfirmation()
+            }
+            .setNegativeButton("Cancel", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show()
+    }
+    
+    private fun showFinalDeleteConfirmation() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Are you absolutely sure?")
+            .setMessage("Type DELETE to confirm account deletion.")
+            .setPositiveButton("Yes, Delete Everything") { _, _ ->
+                deleteAccount()
+            }
+            .setNegativeButton("No, Keep My Account", null)
+            .show()
+    }
+    
+    private fun deleteAccount() {
+        // Clear local data first
+        userRepository.clearAllData()
+        settingsRepository.clearAllSettings()
+        
+        // Delete Firebase data
+        chatRepository.deleteAccount(
+            onSuccess = {
+                activity?.runOnUiThread {
+                    Toast.makeText(requireContext(), "Account deleted", Toast.LENGTH_SHORT).show()
+                    
+                    // Navigate to onboarding
+                    val intent = Intent(requireContext(), OnboardingActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    activity?.finish()
+                }
+            },
+            onError = { error ->
+                activity?.runOnUiThread {
+                    Toast.makeText(requireContext(), "Error: $error", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
     
     private fun loadProfile() {

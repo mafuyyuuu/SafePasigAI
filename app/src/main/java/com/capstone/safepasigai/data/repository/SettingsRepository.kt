@@ -95,4 +95,11 @@ class SettingsRepository(context: Context) {
     fun setAutoShareLocationEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_SHARE_LOCATION, enabled).apply()
     }
+    
+    /**
+     * Clear all settings (for account deletion/reset).
+     */
+    fun clearAllSettings() {
+        prefs.edit().clear().apply()
+    }
 }
